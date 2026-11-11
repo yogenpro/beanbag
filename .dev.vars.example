@@ -1,0 +1,2 @@
+# Local illustrative mode only. Do not put real credentials in demo mode.
+LOCAL_DEMO=true

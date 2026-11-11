@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "beanbag",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+  // Deployment identities, D1 binding, cron and Access policy belong to private infra.
+  // No production demo mode or authentication bypass is configured here.
+  "env": {
+    "local": {
+      "name": "beanbag-local",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": { "LOCAL_DEMO": "true" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "beanbag-local",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+    },
+  },
+}

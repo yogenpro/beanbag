@@ -1,0 +1,98 @@
+import { cents } from "../../accounting/money";
+import { validDate } from "../../accounting/dates";
+import type {
+  BankSource,
+  InvestmentSource,
+  Source,
+} from "../../accounting/types";
+import { decimalText, rawJson, type JsonRecord } from "./client";
+
+export async function revisionOf(value: unknown): Promise<string> {
+  // Key order is stable because normalized records are assembled explicitly below.
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(JSON.stringify(value)),
+  );
+  return Array.from(new Uint8Array(digest), (n) =>
+    n.toString(16).padStart(2, "0"),
+  ).join("");
+}
+export async function withRevision<T extends Omit<Source, "revision">>(
+  record: T,
+): Promise<T & { revision: string }> {
+  return { ...record, revision: await revisionOf(record) };
+}
+function string(value: unknown): string {
+  if (typeof value !== "string") throw new Error("Invalid provider field");
+  return value;
+}
+function date(value: unknown): string {
+  const v = string(value);
+  if (!validDate(v)) throw new Error("Invalid provider date");
+  return v;
+}
+
+export async function normalizeBank(
+  raw: JsonRecord,
+): Promise<{ record: BankSource; raw: string }> {
+  const record = await withRevision({
+    kind: "bank" as const,
+    id: string(raw.transaction_id),
+    accountId: string(raw.account_id),
+    date: date(raw.date),
+    description: string(raw.name),
+    currency: raw.iso_currency_code ?? "UNKNOWN",
+    amountCents: -cents(decimalText(raw.amount)),
+    pending: raw.pending === true,
+    pendingId:
+      typeof raw.pending_transaction_id === "string"
+        ? raw.pending_transaction_id
+        : undefined,
+    category:
+      typeof raw.personal_finance_category?.primary === "string"
+        ? raw.personal_finance_category.primary
+            .replaceAll("_", " ")
+            .toLowerCase()
+        : undefined,
+  });
+  return { record, raw: rawJson(raw) };
+}
+
+export async function normalizeInvestment(
+  raw: JsonRecord,
+  securities: JsonRecord[],
+): Promise<{ record: InvestmentSource; raw: string }> {
+  const security = securities.find((s) => s.security_id === raw.security_id);
+  const activity = string(raw.type),
+    subtype = typeof raw.subtype === "string" ? raw.subtype : undefined;
+  // Do not promote schema-level transfer/positive quantity into verified external origin.
+  // Schwab representation must first be proved using a real, independently linked event.
+  const record = await withRevision({
+    kind: "investment" as const,
+    id: string(raw.investment_transaction_id),
+    accountId: string(raw.account_id),
+    date: date(raw.date),
+    description: string(raw.name),
+    currency: raw.iso_currency_code ?? "UNKNOWN",
+    activity: raw.cancel_transaction_id ? "cancel" : activity,
+    subtype,
+    securityId:
+      typeof raw.security_id === "string" ? raw.security_id : undefined,
+    ticker:
+      typeof security?.ticker_symbol === "string"
+        ? security.ticker_symbol
+        : undefined,
+    quantity: raw.quantity == null ? undefined : decimalText(raw.quantity),
+    cashAmountCents: -cents(decimalText(raw.amount)),
+    direction: "unknown" as const,
+    origin: "unknown" as const,
+    cancelledId:
+      typeof raw.cancel_transaction_id === "string"
+        ? raw.cancel_transaction_id
+        : undefined,
+  });
+  return {
+    record,
+    raw: rawJson({ transaction: raw, security: security ?? null }),
+  };
+}
