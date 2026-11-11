@@ -12,7 +12,9 @@ not tax income, net worth, or credit-card purchase accounting.
 - [x] M1: period aggregates, audit drilldowns, review queue and coverage status.
 - [x] M1: boundary, correction, replay, security and persistence tests.
 - [x] Preview: responsive illustrative dashboard using the same accounting engine.
-- [ ] Publish: public-source privacy check, initialize Git, public GitHub repository.
+- [x] Publish: public-source privacy check, initialize Git, public GitHub repository.
+
+Public source: [yogenpro/beanbag](https://github.com/yogenpro/beanbag).
 
 Private `infra` owns deployment identity, D1 containers, Access applications,
 allowlisted identities, domains and build orchestration. Application source owns
