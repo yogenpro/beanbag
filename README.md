@@ -32,6 +32,12 @@ npm run test:browser   # desktop/mobile interactions against the local Worker
 For an existing browser installation, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`
 to its executable. No test needs bank credentials or actual financial records.
 
+An optional [Plaid Sandbox integration suite](docs/sandbox-testing.md) exercises
+the real Sandbox API, provider-created transactions and SQLite persistence.
+Run `npm run test:sandbox` after saving separate private Sandbox credentials.
+The normal checks remain credential-free; test code and synthetic scenarios can
+be published without publishing any API secret.
+
 ## Reporting convention
 
 | Movement                                                                      | Treatment                                       |

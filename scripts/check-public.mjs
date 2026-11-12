@@ -52,7 +52,7 @@ const patterns = [
   /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})\b/,
   /\baccess-(?:sandbox|development|production)-[a-z0-9-]{20,}\b/i,
   /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/,
-  /(?:PLAID_SECRET|TOKEN_ENCRYPTION_KEY)\s*[:=]\s*["'][A-Za-z0-9+\/=]{24,}["']/,
+  /(?:PLAID_(?:SANDBOX_)?(?:SECRET|CLIENT_ID)|TOKEN_ENCRYPTION_KEY)["']?\s*[:=]\s*["']?[A-Za-z0-9+\/=]{24,}(?=["'\s,;}]|$)/,
   /(?:account(?:_id|_number)?|routing_number)\s*[:=]\s*["']\d{9,19}["']/i,
 ];
 const failures = [];

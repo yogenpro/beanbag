@@ -26,8 +26,9 @@ the only implemented persistence adapter; a VPS adapter is deliberately deferred
 
 ## Verification
 
-The local implementation passes 79 accounting, ingestion, SQLite persistence,
-Access/CSRF/encryption/webhook tests, plus four browser tests across desktop and
+The local implementation passes 93 accounting, ingestion, SQLite persistence,
+Access/CSRF/encryption/webhook, credential isolation and publication-guard tests,
+plus four browser tests across desktop and
 mobile. Type checking, production UI build, Worker dry run, real local D1
 migration and public-source privacy scanning pass. Browser testing includes
 source drilldowns, preview/save/reload of reviews, date controls, pending preview,
@@ -38,3 +39,8 @@ historical-price feed, private Access policy provisioning, and live backup/resto
 remain external or later operating-milestone work. Reviewed historical quotes
 and manual receipts are the implemented fallback; no live financial automation
 or deployment is claimed by the synthetic checks.
+
+An optional [Sandbox API integration suite](sandbox-testing.md) is available via
+`npm run test:sandbox`, with a separate manual GitHub Actions workflow. Actual
+Sandbox API execution awaits the owner's Sandbox credentials; it is not included
+in the credential-free passing-test count above.

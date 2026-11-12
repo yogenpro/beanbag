@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:browser": "playwright test",
+    "test:sandbox": "node scripts/run-sandbox-tests.mjs",
     "check": "npm run test && npm run build && npm run privacy && npm run worker:check",
     "privacy": "node scripts/check-public.mjs",
     "db:local": "wrangler d1 migrations apply DB --local --env local",
