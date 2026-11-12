@@ -8,6 +8,9 @@ The public repository contains portable code and invented test/demo records.
 Deployment identities, household account selection, credentials, financial data,
 and infrastructure policies stay private. There is no ChatGPT runtime dependency.
 
+Resume implementation from [next steps](docs/next-steps.md), which records the
+verified baseline and the remaining live-data and deployment work.
+
 ## Run the illustrative preview
 
 Requires Node 24+ and npm.

@@ -22,3 +22,5 @@ domains, Access policy, D1 containers, cron and orchestration. Do not add produc
 deployment credentials or a second infrastructure writer here.
 
 See docs/implementation.md for completed work and external feasibility gates.
+Read docs/next-steps.md when resuming the project for the verified baseline,
+private configuration locations, and ordered next steps.
