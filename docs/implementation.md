@@ -41,6 +41,8 @@ and manual receipts are the implemented fallback; no live financial automation
 or deployment is claimed by the synthetic checks.
 
 An optional [Sandbox API integration suite](sandbox-testing.md) is available via
-`npm run test:sandbox`, with a separate manual GitHub Actions workflow. Actual
-Sandbox API execution awaits the owner's Sandbox credentials; it is not included
-in the credential-free passing-test count above.
+`npm run test:sandbox`, with a separate manual GitHub Actions workflow. All four
+integration tests have passed against Plaid Sandbox using explicit simulated
+accounts, including share-receipt review and frozen historical valuation. These
+are additional to the credential-free tests above; real institution validation
+remains an external feasibility gate.
