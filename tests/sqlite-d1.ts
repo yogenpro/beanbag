@@ -17,5 +17,11 @@ export function sqliteD1() {
       "utf8",
     ),
   );
+  sqlite.exec(
+    readFileSync(
+      new URL("../migrations/0003_account_history.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   return { db: sqliteAdapter(sqlite), sqlite };
 }

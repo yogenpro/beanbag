@@ -177,13 +177,14 @@ export function createApp(options: Options = {}) {
       end: c.req.query("end") ?? preset.end,
     });
     const repo = c.get("ledger");
-    const [events, accounts, coverage, snapshots, balanceHealth] =
+    const [events, accounts, coverage, snapshots, balanceHealth, historical] =
       await Promise.all([
         repo.events(),
         repo.accounts(),
         repo.coverage(),
         repo.balanceSnapshots(),
         repo.balanceHealth(),
+        repo.accountValueHistory(),
       ]);
     const connection =
       !c.get("demo") && c.env.DB
@@ -198,7 +199,14 @@ export function createApp(options: Options = {}) {
         end: period.end,
       }).months,
       accounts,
-      balances: balanceReport(snapshots, accounts, balanceHealth, period),
+      balances: balanceReport(
+        snapshots,
+        accounts,
+        balanceHealth,
+        period,
+        new Date(),
+        historical,
+      ),
       coverage,
       illustrative: c.get("demo"),
       connectionStatus: c.get("demo")

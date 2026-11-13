@@ -125,7 +125,21 @@ zero. No owner attestation can override the calculation. Legacy confirmations
 remain in immutable stored observations for compatibility, but new collections
 never create them and the dashboard does not display them.
 
-The API returns the latest snapshot independently of the selected report period,
+Private account-value exports and Plaid Assets checking history use the separate
+`account_value_history` table. Each row has its selected account ID, institution
+date, import time, exact net cents, optional asset/loan breakdown, method and source.
+The same account/date may retain both an institution export and an Assets value;
+the institution export takes precedence. Import batches validate completely and
+write atomically through one bound JSON parameter, within D1 size limits.
+
+Already-net brokerage history never receives another borrowing deduction.
+Checking and brokerage history join only on matching institution dates. A later
+dated imported pair may supply the latest total; its actual import time is never
+backdated to manufacture an observation. Observations remain immutable, and
+neither imported history nor public market prices change frozen receipt values.
+No new provider polling or browser write endpoint is introduced.
+
+The API returns the latest value independently of the selected report period,
 plus the latest saved observation per Pacific day in that period. A changed
 account boundary cannot splice histories. Missing daily samples remain gaps;
 there is no historical reconstruction or use of balances as income evidence.

@@ -1,15 +1,16 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { balancePage } from "./balance-page";
 import { assertPeriod, periodFor } from "../accounting/dates";
 import { report } from "../accounting/report";
 import { balanceReport } from "../accounting/balances";
+import { accountValueCsv } from "../accounting/history-csv";
 import { collectBalances } from "../providers/plaid/balances";
 import { PlaidClient, ProviderError } from "../providers/plaid/client";
 import { decryptToken } from "../providers/plaid/secrets";
 import { SyncService } from "../providers/plaid/sync";
 import { loadLocalConfig } from "./config";
-import { LocalError, replacePrivate } from "./files";
+import { LocalError, replacePrivate, privateFile } from "./files";
 import { beginLink, cancelLink, completeLink, connection } from "./link";
 import { openLocalStore } from "./store";
 
@@ -21,6 +22,7 @@ npm run local -- complete-link           Retrieve consent and validate the two-a
 npm run local -- cancel-link             Discard unfinished consent or retry pending Item cleanup
 npm run local -- sync                    Reconcile transactions and save a balance snapshot
 npm run local -- balances                Save a balance snapshot from existing product data
+npm run local -- import-history ROLE FILE [COLUMN]  Import private daily account values for checking or brokerage
 npm run local -- status                  Show connection and product health, without amounts
 npm run local -- report [START END]      Write private evidence.json (month by default)
 
@@ -51,10 +53,17 @@ export async function main(
         "cancel-link",
         "sync",
         "balances",
+        "import-history",
         "status",
         "report",
       ].includes(command) ||
-      (args.length !== 1 && !(command === "report" && args.length === 3))
+      (args.length !== 1 &&
+        !(command === "report" && args.length === 3) &&
+        !(
+          command === "import-history" &&
+          [3, 4].includes(args.length) &&
+          ["checking", "brokerage"].includes(args[1])
+        ))
     )
       throw new LocalError(
         "Unknown command or arguments. Run npm run local -- help.",
@@ -178,6 +187,24 @@ export async function main(
         output(
           `balances: last success ${balances.lastSuccess ?? "never"}; error ${balances.error && /^[A-Z_]+$/.test(balances.error) ? balances.error : "none"}.\n`,
         );
+      } else if (command === "import-history") {
+        const selected = (await store.repo.accounts()).find(
+          (a) =>
+            a.role ===
+            (args[1] === "checking" ? "joint_checking" : "joint_brokerage"),
+        );
+        if (!selected) throw new LocalError("The selected account is missing.");
+        const file = privateFile(project, resolve(args[2]));
+        const rows = accountValueCsv(
+          readFileSync(file, "utf8"),
+          selected,
+          new Date().toISOString(),
+          args[3],
+        );
+        await store.repo.saveAccountValueHistory(rows);
+        output(
+          `Imported ${rows.length} daily account values; transaction records are unchanged.\n`,
+        );
       } else if (command === "report") {
         const events = await store.repo.events();
         const evidence = {
@@ -195,6 +222,8 @@ export async function main(
             await store.repo.accounts(),
             await store.repo.balanceHealth(),
             period,
+            new Date(),
+            await store.repo.accountValueHistory(),
           ),
           sourceEvidence: (
             await store.db

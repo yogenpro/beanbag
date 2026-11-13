@@ -99,10 +99,19 @@ No owner confirmation is needed. Missing USD balances or borrowing remain unknow
 the dashboard shows account value before borrowing when a net total is unavailable.
 Collection time and institution update time are distinct. Balance data comes
 from existing Plaid products and can be cached; no real-time quote is promised.
-History starts with saved observations, with the latest observation per Pacific
-day displayed. Past values are never inferred from transaction history. Changes
+History combines saved observations with private daily account-value exports and
+Plaid Assets checking history. Export dates are preserved as supplied; collection
+time stays separate. Already-net brokerage values are used directly, so borrowing
+is not deducted twice. Institution exports take precedence over calculated Assets
+history for the same account/date. A total requires both selected accounts on the
+same date; missing values are not filled with zero. Past holdings/quotes are not
+reconstructed. Changes
 include market moves and external flows, not just investment returns. Stock
 receipt income remains fixed at its reviewed historical value.
+
+Imported history lives in `account_value_history` (migration
+`0003_account_history.sql`), separate from immutable balance observations and
+financial events. The latest value remains independent of the reporting period.
 
 ## Status and the real-data feasibility gate
 

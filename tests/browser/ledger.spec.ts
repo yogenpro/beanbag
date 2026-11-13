@@ -53,12 +53,15 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
       before.totals.spending,
   );
   await page.getByRole("button", { name: "Year", exact: true }).click();
-  const slider = balances.getByRole("slider", { name: "Snapshot date" });
+  const slider = balances.getByRole("slider", { name: "History date" });
   await slider.focus();
   await page.keyboard.press("Home");
   await expect(slider).toHaveValue("0");
-  await balances.getByText("Snapshots & freshness", { exact: true }).click();
+  await balances.getByText("History & freshness", { exact: true }).click();
   await expect(balances.getByRole("table")).toBeVisible();
+  await expect(
+    balances.getByRole("cell", { name: "Institution export", exact: true }),
+  ).toBeVisible();
   await expect(balances.getByText(/owner|confirm|conflict/i)).toHaveCount(0);
   await expect(page.getByText(/so net worth is not shown/)).toHaveCount(0);
   await page.getByRole("button", { name: "Last month", exact: true }).click();
@@ -202,4 +205,77 @@ test("date controls, pending facts, historical valuation and data-health refresh
       () => document.documentElement.scrollWidth > window.innerWidth,
     ),
   ).toBe(false);
+});
+
+test("institution-dated net history includes borrowing once and stays read-only", async ({
+  page,
+}) => {
+  const fixture = await (await page.request.get("/api/report")).json();
+  expect(fixture.illustrative).toBe(true);
+  const latest = structuredClone(fixture.balances.latest);
+  const date = new Date(latest.date + "T12:00:00Z");
+  date.setUTCDate(date.getUTCDate() + 1);
+  latest.date = date.toISOString().slice(0, 10);
+  latest.asOfDate = latest.date;
+  latest.historyMethods = ["institution_export"];
+  latest.provider = "Illustrative institution export";
+  latest.assetsCents = null;
+  latest.marginLoanCents = null;
+  latest.netWorthCents = 1000000;
+  latest.accounts[0].currentCents = 100000;
+  latest.accounts[0].netValueCents = 100000;
+  latest.accounts[1].currentCents = null;
+  latest.accounts[1].marginLoanCents = null;
+  latest.accounts[1].netValueCents = 900000;
+  const previous = structuredClone(latest);
+  date.setUTCDate(date.getUTCDate() - 1);
+  previous.date = date.toISOString().slice(0, 10);
+  previous.asOfDate = previous.date;
+  fixture.balances = {
+    ...fixture.balances,
+    latest,
+    history: [previous, latest],
+    stale: false,
+  };
+  await page.route("**/api/report*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(fixture),
+    }),
+  );
+  const errors: string[] = [],
+    writes: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("request", (request) => {
+    if (!["GET", "HEAD"].includes(request.method()))
+      writes.push(request.method());
+  });
+  await page.goto("/");
+  const balances = page.getByRole("region", {
+    name: "Tracked net worth",
+    exact: true,
+  });
+  await expect(balances.locator(".balance-total")).toHaveText("$10,000.00");
+  await expect(
+    balances.getByText("Brokerage · net value", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    balances
+      .locator(".balance-breakdown")
+      .getByText("$9,000.00", { exact: true }),
+  ).toBeVisible();
+  await expect(balances.getByText(/borrowing is unavailable/)).toHaveCount(0);
+  await balances.getByText("History & freshness", { exact: true }).click();
+  await expect(
+    balances.getByRole("cell", { name: "Institution export", exact: true }),
+  ).toHaveCount(2);
+  await expect(balances.getByText(/Imported dates follow/)).toBeVisible();
+  await balances.getByRole("slider", { name: "History date" }).focus();
+  await page.keyboard.press("Home");
+  await expect(
+    balances.getByRole("slider", { name: "History date" }),
+  ).toHaveValue("0");
+  expect(errors).toEqual([]);
+  expect(writes).toEqual([]);
 });
