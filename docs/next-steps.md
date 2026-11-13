@@ -178,6 +178,15 @@ or a tax figure. No new pricing, ingestion, schema or stored financial changes
 are needed. The API and private offline report share the calculation; ordinary
 checked-main deployment uses the existing private Cloudflare adapter.
 
+Time-weighted return extends that comparison using daily net values and the same
+external cash/share convention. It is a nonannualized estimate with start-of-day
+inflows and end-of-day outflows; missing daily data or undefined capital bases
+withhold it. This adds no stored financial values, schema, provider requests or
+schedules. Security and recovery explanations must distinguish the live D1
+ledger, private local source evidence, runtime secrets, encrypted operator
+archives and Cloudflare's plan-dependent Time Travel window. Local restore
+receipts do not establish off-device key recovery or a hosted cutover rehearsal.
+
 The updated backend suite has 127 passing tests. The balance-view browser checks
 cover keyboard snapshot selection, the daily table, period changes that preserve
 the latest value, and the existing review flows. Visual inspection includes

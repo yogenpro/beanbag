@@ -41,6 +41,39 @@ approval. Automatic application releases do not enable provider polling.
 
 ## Encrypted database backup
 
+The live reporting ledger is private D1, accessed through the Worker binding.
+It contains transactions/raw source evidence, classifications, valuations,
+balance observations/history and encrypted provider Item tokens. Worker secrets
+hold the separate token-encryption key and provider credentials. Public source
+and CI fixtures contain invented data. Local import PDFs/CSVs, price evidence,
+private reports and the legacy SQLite ledger remain separate from hosted D1;
+they are not an automatic replica of its current state.
+
+Cloudflare provides [managed encryption at rest and in transit](https://developers.cloudflare.com/d1/reference/data-security/).
+Financial rows are readable by the application and authorized operators; this
+is not end-to-end encryption. Access sign-in, signed JWT verification, disabled
+alternate ingress and read-only routes reduce exposure. Privileged Cloudflare,
+identity-provider, repository and local-device access still matter. Code merged
+to main can become production code, so repository write access is part of the
+trust boundary. Protect these accounts with MFA and keep credentials private.
+
+D1's [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
+is automatic for production databases. Its current retention
+[depends on the Workers plan](https://developers.cloudflare.com/d1/platform/limits/):
+seven days on Free or thirty on Paid. This is a rollback layer within the same
+provider/account, not an independent off-device archive of local evidence/keys.
+Verify actual availability and the applicable plan; never infer a recovery test
+from the presence of a bookmark.
+
+Private operator tooling can also create AES-256-GCM archives with an independent
+backup key, recover them into isolated SQLite, check integrity/foreign keys and
+compare every managed table fingerprint. Include all currently managed tables,
+including derived account history; retain the precise scope in a private receipt.
+These archives omit runtime secrets, and a local restore does not establish a
+hosted disaster-recovery cutover. Off-device recovery must cover the encrypted
+database, original import/price evidence, backup-decryption key and provider-token
+encryption key. Keep keys separate from archives and verify their recoverability.
+
 Run these only from the private, authenticated operator environment. Set
 `BEANBAG_PRIVATE_CONFIG` to the disposable private Wrangler configuration and
 `BEANBAG_BACKUP_RECIPIENT` to the approved `age` public recipient. Install `age`
@@ -78,8 +111,9 @@ under an independently recoverable secret-management policy.
    Remove the temporary plaintext according to the encrypted-storage retention
    procedure. No deletion or live restore is automated by this project.
 
-This runbook has not been exercised against a live household database. A backup
-is not recovery proof until an isolated restore has passed these checks.
+The generic export procedure is not itself evidence of a completed restore.
+Private receipts must identify the tested archive, table scope and recovery
+environment. A backup is not recovery proof until an isolated restore passes.
 
 ## Repair
 

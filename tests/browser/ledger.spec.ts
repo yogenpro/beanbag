@@ -612,6 +612,7 @@ test("value change separates net income from estimated investment loss and expla
   ];
   let missingHistory = false;
   let missingBorrowing = false;
+  let missingDailyValue = false;
   await page.route("**/api/report*", (route) => {
     const url = new URL(route.request().url()),
       period = {
@@ -650,6 +651,7 @@ test("value change separates net income from estimated investment loss and expla
             : points.at(-1),
           stale: false,
           history: points
+            .filter((p) => !missingDailyValue || p.date !== "2026-10-21")
             .map((p) =>
               missingBorrowing
                 ? { ...p, assetsCents: p.netWorthCents! + 20000 }
@@ -657,7 +659,7 @@ test("value change separates net income from estimated investment loss and expla
             )
             .filter((p) => p.date >= period.start && p.date <= period.end),
           change: accountValueChange(
-            points,
+            points.filter((p) => !missingDailyValue || p.date !== "2026-10-21"),
             events,
             fixture.accounts,
             coverage,
@@ -684,6 +686,8 @@ test("value change separates net income from estimated investment loss and expla
     "$1,200.00 income − $300.00 expenses",
   );
   await expect(amounts.nth(2).locator("dd")).toContainText("-$400.00");
+  await expect(amounts.nth(3).locator("dt")).toHaveText("Time-weighted return");
+  await expect(amounts.nth(3).locator("dd")).toContainText("-3.68%");
   await group.getByText("How this is calculated", { exact: true }).click();
   await expect(
     group.getByText(/not a rate of return or taxable gain/),
@@ -711,6 +715,14 @@ test("value change separates net income from estimated investment loss and expla
     group.getByText(/Transaction history for both accounts is needed/),
   ).toBeVisible();
   missingHistory = false;
+  missingDailyValue = true;
+  await page.reload();
+  await expect(amounts.nth(2).locator("dd")).toContainText("-$400.00");
+  await expect(amounts.nth(3).locator("dd")).toContainText("Unavailable");
+  await expect(
+    group.getByText(/needs a net value for every day/),
+  ).toBeVisible();
+  missingDailyValue = false;
   missingBorrowing = true;
   await page.reload();
   await expect(

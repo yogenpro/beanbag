@@ -7,6 +7,7 @@ const signed = (value: number | null) =>
 export function ValueChangeBreakdown({ data }: { data: ValueChange | null }) {
   if (!data) return null;
   const ready = data.status === "estimated";
+  const twr = data.timeWeightedReturn;
   return (
     <div
       className="value-change"
@@ -52,7 +53,29 @@ export function ValueChangeBreakdown({ data }: { data: ValueChange | null }) {
                 <span className="value-change-estimate">Estimate</span>
               </dd>
             </div>
+            <div>
+              <dt>Time-weighted return</dt>
+              <dd>
+                {twr?.rate === null || !twr
+                  ? "Unavailable"
+                  : `${twr.rate > 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(twr.rate)}`}
+                <span className="value-change-estimate">
+                  Daily estimate · period return
+                </span>
+              </dd>
+            </div>
           </dl>
+          {ready && twr?.status === "unavailable" && (
+            <p className="help">
+              {twr.reason === "missing_daily_values"
+                ? "Time-weighted return needs a net value for every day in the comparison. The dollar gain/loss can still be estimated from the endpoints."
+                : twr.reason === "no_invested_capital"
+                  ? "No invested capital is recorded in this comparison, so a percentage return is undefined."
+                  : twr.reason === "non_positive_capital"
+                    ? "Time-weighted return is unavailable where net capital is negative or the return denominator is zero."
+                    : "The saved values do not support a reliable percentage return for this comparison."}
+            </p>
+          )}
           {data.partialPeriod && (
             <p className="help">
               Using the dates with saved net values. The comparison covers part
@@ -86,7 +109,15 @@ export function ValueChangeBreakdown({ data }: { data: ValueChange | null }) {
               timing differences. It is a dollar estimate, not a rate of return
               or taxable gain. Loaded history can still omit activity.
             </p>
-            {data.estimatedBalances && (
+            <p className="help">
+              Time-weighted return compounds daily returns after adjusting for
+              external cash and share flows. Incoming flows are assumed to
+              arrive at the start of each day and outgoing flows at the end.
+              This is the return over the displayed period, without annualizing;
+              intraday valuations are unavailable. Brokerage dividends, interest
+              and fees remain in performance.
+            </p>
+            {(data.estimatedBalances || twr?.usesReconstructedValues) && (
               <p className="help">
                 This comparison uses a reconstructed balance with the same-day
                 settlement assumption.
