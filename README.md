@@ -116,17 +116,20 @@ as proof of complete coverage.
 
 ## Deployment contract
 
-The existing private `infra` repository owns deployment. This project does not
-deploy from GitHub CI. The portable `wrangler.jsonc` has no production account ID,
-domain, database ID, Access audience, household identity or account mask.
+The existing private `infra` repository owns deployment. Successful checks for a
+trusted `main` push request a fixed-main Cloudflare build using an encrypted
+deploy-hook capability. Cloudflare runs the checked build with the private
+adapter and deployment credential; no Cloudflare API token enters public CI.
+The portable `wrangler.jsonc` has no production account ID, domain, database ID,
+Access audience, household identity or account mask.
 
 `infra` should supply a disposable private Wrangler configuration with:
 
 - Worker name, `DB` D1 binding, `ASSETS`, and the checked-in migration directory.
 - `assets.run_worker_first: true`, disabled `workers_dev` and `preview_urls`.
 - Custom domain behind an Access gate, covering pages and API routes.
-- Two approved individual identities, both with read-only dashboard access.
-- A periodic `scheduled` trigger, plus an exact, separately secured webhook URL.
+- Explicitly approved individual identities with read-only dashboard access.
+- A periodic `scheduled` trigger and separately secured webhook only when enabled.
 - The private settings and Worker secrets described in the setup guide.
 
 The application verifies signed Access JWTs independently, including issuer,
@@ -138,3 +141,8 @@ requires Plaid's ES256 signature, age check, exact-body SHA-256 and replay recei
 Keep domains and Access policies in Terraform, and code/assets/bindings in the
 app build adapter. Bootstrap with closed ingress, establish the gate, then attach
 the domain. No production infrastructure is created by this repository.
+
+Ordinary `main` code changes deploy automatically after checks pass. Schema
+changes require private migration/backup review before the adapter accepts them.
+Automatic code deployment is separate from bank-data polling, which remains off
+for the initial saved-data rollout.

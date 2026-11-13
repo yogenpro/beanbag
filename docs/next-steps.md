@@ -92,7 +92,7 @@ All dashboard API mutations are rejected for every identity (including admins).
 belong to private operator tooling or separately authenticated provider ingestion.
 Hosted consent/repair provisioning needs a private operator path before deployment;
 do not restore browser write routes to complete it. The current automated suite
-has 128 passing tests, including rejection of writes without database/provider
+has 141 passing tests, including rejection of writes without database/provider
 effects. Four desktop/mobile checks cover read-only browsing and no write requests.
 
 The owner also requested current tracked-account value/net worth and a history
@@ -146,8 +146,8 @@ npm run check
 npm run dev
 ```
 
-The UI at `http://127.0.0.1:8787` is **Illustrative**. Its repository is in memory;
-page reloads preserve edits while a Worker restart resets them. Applying local
+The UI at `http://127.0.0.1:8787` is **Illustrative**. Its read-only repository is
+in memory; a Worker restart resets the invented observations. Applying local
 D1 migrations does not make the demo read that database.
 
 For provider verification, run the separate suite:
@@ -199,8 +199,11 @@ credential-free. See [Sandbox testing](sandbox-testing.md).
    reviewed evidence; an automatic historical price service is not selected.
    Verify that a subsequent sale and internal cash transfer create no second
    income event. Keep the manual receipt fallback if feed coverage is incomplete.
-3. **Prepare deployment in private infra.** Read that repository's instructions
-   and existing build-adapter pattern before editing it. Infra owns domains,
+3. **Maintain deployment in private infra.** The owner requested deployment and
+   automatic application updates from main. Public checks now request a fixed-main
+   Cloudflare build; infra owns the adapter, gated ingress, build hook, deployment
+   credential and private D1. Keep current rollout evidence in its private runbook.
+   Infra owns domains,
    Access identities/policies, D1 identity, cron and build orchestration. The app
    owns portable code, migrations/assets and binding contracts. Preserve
    `assets.run_worker_first`, disabled workers.dev/previews, and protection for
@@ -214,10 +217,11 @@ credential-free. See [Sandbox testing](sandbox-testing.md).
 
 ## Limits to preserve
 
-Sandbox success establishes the API integration with simulated data. Real Schwab
-share-transfer representation, live Access policy, webhook delivery, cron and
-backup recovery remain unverified. No application was deployed to Cloudflare
-and no private `infra` changes were made in this session.
+Sandbox success establishes the API integration with simulated data. Share-price
+provenance, interactive household sign-in, webhook delivery, bank polling and
+backup recovery remain separate acceptance work. Bank polling remains off for
+the initial saved-data deployment. The private infra runbook records live
+deployment, Access and D1 checks without publishing infrastructure identities.
 
 The accounting boundary stays fixed: external checking receipts plus verified
 incoming shares are income; checking payments outside the pair are spending;

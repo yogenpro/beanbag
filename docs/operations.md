@@ -1,9 +1,16 @@
 # Private deployment, backups and repair
 
-Public CI runs credential-free checks only. Deployment is orchestrated by private
-infra using the established checked-build/private-adapter pattern. Do not copy
+Public CI runs credential-free application checks. After a trusted main push
+passes, it verifies the current branch head and requests a fixed-main Cloudflare
+build using the encrypted `BEANBAG_DEPLOY_HOOK` capability. The request helper
+rejects forks/other refs, skips superseded commits, withholds provider errors and
+does not forward its GitHub token to Cloudflare. Cloudflare deployment is
+orchestrated by private infra using the checked-build/private-adapter pattern.
+No Cloudflare API credential is installed in the public repository. Do not copy
 infrastructure tokens, account IDs, hostnames, Access policy or database identities
-into this repository. This milestone does not provision or deploy Cloudflare.
+into this repository. The private adapter must reject unapproved schema changes;
+apply migrations after the required backup/recovery review before updating that
+approval. Automatic application releases do not enable provider polling.
 
 ## Deployment checklist
 
