@@ -110,6 +110,15 @@ daily table with checking, brokerage net, combined value and source. An imported
 already-net brokerage value needs no additional loan deduction or confirmation.
 Display a later imported pair as of its provider date; keep missing dates as gaps.
 
+Period picker refinement: replace the five presets with Last 1 month (default),
+Last 3 months, Last 6 months, Year to date, Last year and Max. The owner confirmed
+rolling 1/3/6-month defaults with calendar choices. Put one native period select
+below the tab row: month, quarter, half-year or year, with an explicit date span.
+Max covers every saved date. Preserve the current white/ink/blue controls; use
+three columns over two rows on narrow screens, readable labels and keyboard tabs.
+All totals and charts follow the range; latest account value stays independent.
+This is an extension of the accepted system, with no design-token rewrite.
+
 Use only the loopback illustrative repository. Build before browser checks,
 exercise all three views and read-only record details, inspect desktop/mobile
 screenshots, and run the Impeccable detector once. Finish with a visual review of

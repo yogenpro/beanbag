@@ -1,5 +1,144 @@
 import { expect, test } from "@playwright/test";
 
+test("rolling ranges, calendar period dropdowns, Max and keyboard tabs", async ({
+  page,
+}) => {
+  const fixture = await (await page.request.get("/api/report")).json();
+  expect(fixture.illustrative).toBe(true);
+  await page.clock.install({ time: new Date("2026-11-12T20:00:00Z") });
+  fixture.availablePeriod = { start: "2024-11-13", end: "2026-11-13" };
+  let failRead = false;
+  await page.route("**/api/report*", (route) => {
+    if (failRead)
+      return route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Illustrative read failed" }),
+      });
+    const url = new URL(route.request().url()),
+      data = structuredClone(fixture);
+    data.period = {
+      start: url.searchParams.get("start"),
+      end: url.searchParams.get("end"),
+    };
+    data.balances.history = data.balances.history.filter(
+      (point: { date: string }) =>
+        point.date >= data.period.start && point.date <= data.period.end,
+    );
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(data),
+    });
+  });
+  const queries: string[] = [],
+    writes: string[] = [],
+    errors: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/report?"))
+      queries.push(new URL(request.url()).search);
+    if (!["GET", "HEAD"].includes(request.method()))
+      writes.push(request.method());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  const tabs = page.getByRole("tablist", { name: "Reporting range" });
+  await expect(tabs.getByRole("tab")).toHaveText([
+    "Last 1 month",
+    "Last 3 months",
+    "Last 6 months",
+    "Year to date",
+    "Last year",
+    "Max",
+  ]);
+  await expect(
+    tabs.getByRole("tab", { name: "Last 1 month", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2026-10-12&end=2026-11-12");
+  const latest = await page.locator(".balance-total").innerText();
+  await page
+    .getByRole("combobox", { name: "Month", exact: true })
+    .selectOption("2025-02");
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2025-02-01&end=2025-02-28");
+  await tabs.getByRole("tab", { name: "Last 3 months", exact: true }).click();
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2026-08-12&end=2026-11-12");
+  await page
+    .getByRole("combobox", { name: "Quarter", exact: true })
+    .selectOption("2025-Q1");
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2025-01-01&end=2025-03-31");
+  failRead = true;
+  await page
+    .getByRole("combobox", { name: "Quarter", exact: true })
+    .selectOption("2025-Q2");
+  await expect(
+    page.getByRole("heading", { name: "Unable to open the ledger" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Quarter", exact: true }),
+  ).toHaveValue("2025-Q2");
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2025-04-01&end=2025-06-30");
+  failRead = false;
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(page.locator(".balance-total")).toHaveText(latest);
+  await tabs.getByRole("tab", { name: "Last 6 months", exact: true }).click();
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2026-05-12&end=2026-11-12");
+  await page
+    .getByRole("combobox", { name: "Half-year", exact: true })
+    .selectOption("2025-H2");
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2025-07-01&end=2025-12-31");
+  await tabs.getByRole("tab", { name: "Year to date", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Year", exact: true })
+    .selectOption("2025");
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2025-01-01&end=2025-11-12");
+  await tabs.getByRole("tab", { name: "Last year", exact: true }).click();
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2025-01-01&end=2025-12-31");
+  await tabs.getByRole("tab", { name: "Max", exact: true }).click();
+  await expect
+    .poll(() => queries.at(-1))
+    .toBe("?start=2024-11-13&end=2026-11-13");
+  await expect(
+    page.getByRole("combobox", { name: "History", exact: true }),
+  ).toHaveValue("all");
+  await expect(page.locator(".balance-total")).toHaveText(latest);
+  await page.keyboard.press("Home");
+  await expect(
+    tabs.getByRole("tab", { name: "Last 1 month", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    tabs.getByRole("tab", { name: "Last 3 months", exact: true }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("combobox", { name: "Quarter", exact: true }),
+  ).toHaveValue("rolling");
+  expect(writes).toEqual([]);
+  expect(errors).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+});
+
 test("read-only dashboard: totals, charts, filters and record evidence without writes", async ({
   page,
 }) => {
@@ -52,7 +191,7 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
       before.totals.stockIncome -
       before.totals.spending,
   );
-  await page.getByRole("button", { name: "Year", exact: true }).click();
+  await page.getByRole("tab", { name: "Year to date", exact: true }).click();
   const slider = balances.getByRole("slider", { name: "History date" });
   await slider.focus();
   await page.keyboard.press("Home");
@@ -64,9 +203,9 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
   ).toBeVisible();
   await expect(balances.getByText(/owner|confirm|conflict/i)).toHaveCount(0);
   await expect(page.getByText(/so net worth is not shown/)).toHaveCount(0);
-  await page.getByRole("button", { name: "Last month", exact: true }).click();
+  await page.getByRole("tab", { name: "Last 3 months", exact: true }).click();
   await expect(balances.locator(".balance-total")).toHaveText(total);
-  await page.getByRole("button", { name: "This month", exact: true }).click();
+  await page.getByRole("tab", { name: "Last 1 month", exact: true }).click();
   await page
     .getByRole("button", { name: "View total expense records" })
     .click();
@@ -124,13 +263,15 @@ test("date controls, pending facts, historical valuation and data-health refresh
     if (!["GET", "HEAD"].includes(request.method())) writes.push(request.url());
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Year", exact: true }).click();
+  await page.getByRole("tab", { name: "Year to date", exact: true }).click();
   await expect(
     page.getByRole("group", { name: /Monthly income/ }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Custom", exact: true }).click();
-  await expect(page.getByLabel("Start date", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "This month", exact: true }).click();
+  await page.getByRole("tab", { name: "Last 3 months", exact: true }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Quarter", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Last 1 month", exact: true }).click();
   await page.locator("#activity-tab").click();
   await page.getByLabel("Filter activity").selectOption("pending");
   await expect(

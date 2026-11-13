@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCheck,
   ChevronRight,
-  CalendarDays,
   CircleAlert,
   Leaf,
   LayoutDashboard,
@@ -17,7 +16,9 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { periodFor, type Period } from "../accounting/dates";
+import { PeriodPicker } from "./period-picker";
+import { periodOptions, type RangeSelection } from "./periods";
+import type { Period } from "../accounting/dates";
 import type { EventKind, FinancialEvent } from "../accounting/types";
 import { api, money, displayDate, type Dashboard, type Detail } from "./api";
 import { AccountValue } from "./account-value";
@@ -326,7 +327,7 @@ function Trend({
           <h2>Income & expenses</h2>
         </div>
         <span className="subtle">
-          {data.period.end.slice(0, 4)} · through {displayDate(data.period.end)}
+          {displayDate(data.period.start)} — {displayDate(data.period.end)}
         </span>
       </div>
       <div className="legend">
@@ -358,39 +359,54 @@ function Trend({
             <span>{money(Math.round(max / 2))}</span>
             <span>$0</span>
           </div>
-          <div className="bars">
-            {months.map((m) => (
-              <button
-                className={`month-bar ${data.period.start.startsWith(m.month) && data.period.end.startsWith(m.month) ? "selected" : ""}`}
-                key={m.month}
-                onClick={() => select(m.month)}
-                aria-label={`${m.month}: cash income ${money(m.cashIncome)}, stock transfers ${money(m.stockIncome)}, expenses ${money(m.spending)}`}
-                title={`${m.month}: checking ${money(m.cashIncome)} · stock ${money(m.stockIncome)} · spending ${money(m.spending)}`}
-              >
-                <span className="bar-pair">
-                  <span className="income-bar">
+          <div
+            className="bars-viewport"
+            tabIndex={0}
+            role="group"
+            aria-label="Scroll monthly income and expenses"
+          >
+            <div className="bars">
+              {months.map((m) => (
+                <button
+                  className={`month-bar ${data.period.start.startsWith(m.month) && data.period.end.startsWith(m.month) ? "selected" : ""}`}
+                  key={m.month}
+                  onClick={() => select(m.month)}
+                  aria-label={`${m.month}: cash income ${money(m.cashIncome)}, stock transfers ${money(m.stockIncome)}, expenses ${money(m.spending)}`}
+                  title={`${m.month}: checking ${money(m.cashIncome)} · stock ${money(m.stockIncome)} · spending ${money(m.spending)}`}
+                >
+                  <span className="bar-pair">
+                    <span className="income-bar">
+                      <span
+                        className="bar-stock"
+                        style={{ height: `${(m.stockIncome / max) * 100}%` }}
+                      />
+                      <span
+                        className="bar-cash"
+                        style={{ height: `${(m.cashIncome / max) * 100}%` }}
+                      />
+                    </span>
                     <span
-                      className="bar-stock"
-                      style={{ height: `${(m.stockIncome / max) * 100}%` }}
-                    />
-                    <span
-                      className="bar-cash"
-                      style={{ height: `${(m.cashIncome / max) * 100}%` }}
+                      className="bar-spend"
+                      style={{ height: `${(m.spending / max) * 100}%` }}
                     />
                   </span>
-                  <span
-                    className="bar-spend"
-                    style={{ height: `${(m.spending / max) * 100}%` }}
-                  />
-                </span>
-                <span className="month-label">
-                  {new Date(m.month + "-15T12:00:00Z").toLocaleDateString(
-                    "en-US",
-                    { month: "short", timeZone: "UTC" },
-                  )}
-                </span>
-              </button>
-            ))}
+                  <span className="month-label">
+                    {new Date(m.month + "-15T12:00:00Z").toLocaleDateString(
+                      "en-US",
+                      {
+                        month: "short",
+                        year:
+                          data.period.start.slice(0, 4) !==
+                          data.period.end.slice(0, 4)
+                            ? "2-digit"
+                            : undefined,
+                        timeZone: "UTC",
+                      },
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -610,16 +626,23 @@ function Health({
   );
 }
 function App() {
-  const [period, setPeriod] = useState<Period>(() => periodFor("month")),
-    [preset, setPreset] = useState("month");
+  const [selection, setSelection] = useState<RangeSelection>({
+    tab: "month",
+    value: "rolling",
+  });
   const [data, setData] = useState<Dashboard | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [loading, setLoading] = useState(true);
+  const [availablePeriod, setAvailablePeriod] = useState<Period>();
   const [tab, setTab] = useState<Tab>("overview"),
     [filter, setFilter] = useState<Filter>("all"),
     [detail, setDetail] = useState<Detail | null>(null);
   const request = useRef(0);
+  const options = periodOptions(selection.tab, availablePeriod);
+  const selected =
+    options.find((option) => option.value === selection.value) ?? options[0];
+  const period = selected.period;
   async function load() {
     const id = ++request.current;
     setLoading(true);
@@ -628,7 +651,10 @@ function App() {
       const value = await api<Dashboard>(
         `/api/report?start=${period.start}&end=${period.end}`,
       );
-      if (id === request.current) setData(value);
+      if (id === request.current) {
+        setData(value);
+        setAvailablePeriod(value.availablePeriod);
+      }
     } catch (e) {
       if (id === request.current) {
         setData(null);
@@ -747,65 +773,12 @@ function App() {
             Read-only
           </span>
         </div>
-        <div className="period-bar">
-          <div className="period-presets" aria-label="Reporting period">
-            {[
-              ["month", "This month"],
-              ["previous", "Last month"],
-              ["quarter", "Quarter"],
-              ["year", "Year"],
-              ["custom", "Custom"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                className={preset === value ? "selected" : ""}
-                aria-pressed={preset === value}
-                onClick={() => {
-                  setPreset(value);
-                  if (value !== "custom") setPeriod(periodFor(value));
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {preset === "custom" ? (
-            <div className="custom-period">
-              <label>
-                <span className="sr-only">Start date</span>
-                <input
-                  aria-label="Start date"
-                  type="date"
-                  value={period.start}
-                  max={period.end}
-                  onChange={(e) => {
-                    if (e.target.value)
-                      setPeriod({ ...period, start: e.target.value });
-                  }}
-                />
-              </label>
-              <span>to</span>
-              <label>
-                <span className="sr-only">End date</span>
-                <input
-                  aria-label="End date"
-                  type="date"
-                  value={period.end}
-                  min={period.start}
-                  onChange={(e) => {
-                    if (e.target.value)
-                      setPeriod({ ...period, end: e.target.value });
-                  }}
-                />
-              </label>
-            </div>
-          ) : (
-            <span className="period-label">
-              <CalendarDays size={15} aria-hidden="true" />
-              {displayDate(period.start)} — {displayDate(period.end)}
-            </span>
-          )}
-        </div>
+        <PeriodPicker
+          selection={selection}
+          options={options}
+          selected={selected}
+          onChange={setSelection}
+        />
         {notice && (
           <div className="notice" role="status">
             {notice}
@@ -969,19 +942,7 @@ function App() {
                     <Trend
                       data={data}
                       select={(month) => {
-                        setPreset("custom");
-                        setPeriod({
-                          start: month + "-01",
-                          end: new Date(
-                            Date.UTC(
-                              Number(month.slice(0, 4)),
-                              Number(month.slice(5, 7)),
-                              0,
-                            ),
-                          )
-                            .toISOString()
-                            .slice(0, 10),
-                        });
+                        setSelection({ tab: "month", value: month });
                         setFilter("all");
                         setTab("activity");
                       }}
