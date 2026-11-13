@@ -5,7 +5,10 @@ import {
   projectAccountValue,
   type ProjectionAssumptions,
 } from "../src/ui/projection-model";
-import { projectionFixture } from "./projection-fixtures";
+import {
+  longProjectionFixture,
+  projectionFixture,
+} from "./projection-fixtures";
 
 const assumptions: ProjectionAssumptions = {
   cash: 600,
@@ -15,6 +18,32 @@ const assumptions: ProjectionAssumptions = {
   flowDeviation: 0,
 };
 describe("browser-only projection estimates", () => {
+  it("Max includes covered months and daily returns older than five years", () => {
+    const fixture = longProjectionFixture();
+    const fiveYears = calibrateProjection(fixture, 60);
+    const max = calibrateProjection(fixture, "max");
+    expect(fiveYears.historyMonths).toBe(60);
+    expect(max.historyMonths).toBe(64);
+    expect(max.flowMonths).toHaveLength(64);
+    expect(max.flowMonths[0]).toBe("2021-01");
+    expect(max.returnMonths).toHaveLength(8);
+    expect(max.returnMonths[0]).toBe("2021-01");
+    expect(fiveYears.returnMonths).toHaveLength(4);
+    expect(fiveYears.defaults.cash).toBe(40);
+    expect(max.defaults.cash).toBe(75);
+    expect(max.defaults.shares).toBe(50);
+    expect(max.flowMonths.at(-1)).toBe("2026-04");
+  });
+  it("Max handles missing coverage and a start within the anchor month without invented estimates", () => {
+    const fixture = projectionFixture();
+    fixture.coverage = [];
+    expect(calibrateProjection(fixture, "max").defaults.cash).toBeNull();
+    fixture.availablePeriod.start = "2026-05-01";
+    const result = calibrateProjection(fixture, "max");
+    expect(result.historyMonths).toBe(0);
+    expect(result.flowMonths).toEqual([]);
+    expect(result.returnMonths).toEqual([]);
+  });
   it("separates external cash and shares, compounds flow-adjusted returns, and excludes the anchor month", () => {
     const result = calibrateProjection(projectionFixture(), 12);
     expect(result.flowMonths).toEqual([

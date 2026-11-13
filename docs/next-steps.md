@@ -10,6 +10,8 @@ daily-balance checks withhold unsupported defaults. Users can enter assumptions
 without changing the ledger. The median graph, selectable outcome band, month
 inspection and annual table all run locally; inputs remain in browser memory and
 reset on reload. No backend endpoint, schema or infrastructure change is needed.
+History windows include Max, which uses all available loaded history and retains
+the same whole-month coverage and return-quality requirements.
 See README's future-projections section for the model and its limitations.
 This local implementation does not establish deployment or live-data coverage.
 

@@ -101,10 +101,10 @@ coverage, unresolved flows and missing daily values withhold unsupported default
 manual assumptions are explicit. Model details disclose nominal-dollar values,
 constant parameters, independent return/contribution draws and unmodeled risks.
 
-The updated credential-free suite passes 255 tests, including nine projection
+The updated credential-free suite passes 257 tests, including eleven projection
 tests for cash/share separation, zero-flow months, data gaps, reconstructed
 provenance, known future-value arithmetic, repeatable percentiles, depletion and
-numeric limits. All 22 desktop/mobile browser checks pass, including forecast
+numeric limits and Max history beyond five years. All 24 desktop/mobile browser checks pass, including forecast
 parameter updates without requests, navigation/reset behavior, missing history,
 unknown net balances, retries and responsive screenshots. Production UI build,
 privacy scan and Worker dry run pass. This verifies the local synthetic app;

@@ -4,14 +4,14 @@ import { api, displayDate, money, type Dashboard } from "./api";
 import {
   assumptionLimits,
   calibrateProjection,
-  monthBounds,
   projectAccountValue,
   type ProjectionAssumptions,
   type ProjectionPoint,
+  type ProjectionLookback,
 } from "./projection-model";
 
 export type ProjectionSettings = {
-  lookback: number;
+  lookback: ProjectionLookback;
   years: number;
   confidence: number;
   overrides: Partial<Record<keyof ProjectionAssumptions, string>>;
@@ -256,12 +256,9 @@ export function Projections({
     }
     setLoading(true);
     setError("");
-    const opening = new Date(
-      Date.parse(monthBounds(anchor, -60).start) - 86_400_000,
-    )
-      .toISOString()
-      .slice(0, 10);
-    void api<Dashboard>(`/api/report?start=${opening}&end=9999-12-31`)
+    // Load all saved history once so Max also includes observations older than
+    // five years. Window changes and user-entered assumptions remain local.
+    void api<Dashboard>(`/api/report?start=0001-01-01&end=9999-12-31`)
       .then((result) => {
         if (active) setHistory(result);
       })
@@ -377,12 +374,18 @@ export function Projections({
           <select
             value={settings.lookback}
             onChange={(event) =>
-              update({ lookback: Number(event.target.value) })
+              update({
+                lookback:
+                  event.target.value === "max"
+                    ? "max"
+                    : Number(event.target.value),
+              })
             }
           >
             <option value={12}>Past 12 months</option>
             <option value={36}>Past 3 years</option>
             <option value={60}>Past 5 years</option>
+            <option value="max">Max</option>
           </select>
         </label>
         <label>
@@ -586,7 +589,8 @@ export function Projections({
           <p>
             Based on {calibration?.flowMonths.length ?? 0} usable contribution
             months and {calibration?.returnMonths.length ?? 0} usable return
-            months out of the {settings.lookback} months before{" "}
+            months out of the {calibration?.historyMonths ?? 0}{" "}
+            {settings.lookback === "max" ? "available months" : "months"} before{" "}
             {latest.date.slice(0, 7)}. The starting balance is always the latest
             saved net value, independent of the history window.
           </p>
