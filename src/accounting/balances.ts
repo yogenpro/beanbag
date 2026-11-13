@@ -113,6 +113,7 @@ export function balanceReport(
     .map((s) => balancePoint(s, accounts));
   const daily = new Map<string, BalancePoint>();
   const imports = new Map<string, Map<string, HistoricalValue>>();
+  const priority = { institution_export: 3, plaid_assets: 2, reconstructed: 1 };
   for (const value of historical.filter((v) =>
     accounts.some((a) => a.id === v.accountId),
   )) {
@@ -120,8 +121,7 @@ export function balanceReport(
     const previous = day.get(value.accountId);
     if (
       !previous ||
-      (value.method === "institution_export" &&
-        previous.method !== "institution_export") ||
+      priority[value.method] > priority[previous.method] ||
       (previous.method === value.method &&
         value.calculatedAt > previous.calculatedAt)
     )

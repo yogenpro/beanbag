@@ -2,11 +2,17 @@ export type HistoricalValue = {
   accountId: string;
   date: string;
   calculatedAt: string;
-  method: "plaid_assets" | "institution_export";
+  method: "plaid_assets" | "institution_export" | "reconstructed";
   netValueCents: number | null;
   assetsCents: number | null;
   borrowingCents: number | null;
   source: string;
+  reconstruction?: {
+    settlement: "same_day";
+    prices: "unadjusted_close_and_transaction_nav";
+    nonTradingDays: "previous_close";
+    evidenceSha256: string;
+  };
 };
 import { validDate } from "./dates";
 import type { Account } from "./types";
@@ -23,7 +29,9 @@ export function validateHistory(
       !account ||
       !validDate(v.date) ||
       !Number.isFinite(Date.parse(v.calculatedAt)) ||
-      !["plaid_assets", "institution_export"].includes(v.method) ||
+      !["plaid_assets", "institution_export", "reconstructed"].includes(
+        v.method,
+      ) ||
       typeof v.source !== "string" ||
       !v.source ||
       v.source.length > 250 ||
@@ -32,7 +40,15 @@ export function validateHistory(
         (n) => n !== null && !Number.isSafeInteger(n),
       ) ||
       (v.borrowingCents !== null && v.borrowingCents < 0) ||
-      (v.method === "plaid_assets" && account.role !== "joint_checking")
+      (v.method === "plaid_assets" && account.role !== "joint_checking") ||
+      (v.method === "reconstructed" &&
+        (account.role !== "joint_brokerage" ||
+          v.netValueCents === null ||
+          v.reconstruction?.settlement !== "same_day" ||
+          v.reconstruction?.prices !== "unadjusted_close_and_transaction_nav" ||
+          v.reconstruction?.nonTradingDays !== "previous_close" ||
+          !/^[a-f0-9]{64}$/.test(v.reconstruction?.evidenceSha256 ?? ""))) ||
+      (v.method !== "reconstructed" && v.reconstruction !== undefined)
     )
       throw new Error("Invalid account history");
     if (

@@ -28,7 +28,7 @@ export class D1Ledger implements LedgerRepository {
   constructor(readonly db: D1Database) {}
   accountValueHistory() {
     return this.jsonRows<HistoricalValue>(
-      "SELECT value_json FROM account_value_history ORDER BY as_of_date,account_id,method",
+      "SELECT value_json FROM (SELECT * FROM account_value_history UNION ALL SELECT * FROM account_value_reconstructions) ORDER BY as_of_date,account_id,method",
       "value_json",
     );
   }
@@ -38,16 +38,19 @@ export class D1Ledger implements LedgerRepository {
     const payload = JSON.stringify(values);
     if (new TextEncoder().encode(payload).length > 1500000)
       throw new Error("History batch exceeds byte limit");
-    await this.db
-      .prepare(
-        `INSERT INTO account_value_history(account_id,as_of_date,method,value_json)
+    await this.db.batch(
+      ["account_value_history", "account_value_reconstructions"].map((table) =>
+        this.db
+          .prepare(
+            `INSERT INTO ${table}(account_id,as_of_date,method,value_json)
       SELECT json_extract(value,'$.accountId'),json_extract(value,'$.date'),json_extract(value,'$.method'),value
-      FROM json_each(?) WHERE 1
+      FROM json_each(?) WHERE ${table === "account_value_reconstructions" ? "" : "NOT "}(json_extract(value,'$.method')='reconstructed')
       ON CONFLICT(account_id,as_of_date,method) DO UPDATE SET value_json=excluded.value_json
-      WHERE json_extract(excluded.value_json,'$.calculatedAt') > json_extract(account_value_history.value_json,'$.calculatedAt')`,
-      )
-      .bind(payload)
-      .run();
+      WHERE json_extract(excluded.value_json,'$.calculatedAt') > json_extract(${table}.value_json,'$.calculatedAt')`,
+          )
+          .bind(payload),
+      ),
+    );
   }
   balanceSnapshots() {
     return this.jsonRows<BalanceSnapshot>(

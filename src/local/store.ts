@@ -94,7 +94,7 @@ export function openLocalStore(config: LocalConfig) {
         sqlite.exec("ROLLBACK");
         throw error;
       }
-    } else if (![1, 2, 3].includes(version))
+    } else if (![1, 2, 3, 4].includes(version))
       throw new LocalError(
         "Unsupported local ledger version; use the matching application version.",
       );
@@ -134,6 +134,21 @@ export function openLocalStore(config: LocalConfig) {
           ),
         );
         sqlite.exec("PRAGMA user_version=3; COMMIT;");
+      } catch (error) {
+        sqlite.exec("ROLLBACK");
+        throw error;
+      }
+    }
+    if (version < 4) {
+      sqlite.exec("BEGIN IMMEDIATE");
+      try {
+        sqlite.exec(
+          readFileSync(
+            join(config.project, "migrations/0004_reconstructed_history.sql"),
+            "utf8",
+          ),
+        );
+        sqlite.exec("PRAGMA user_version=4; COMMIT;");
       } catch (error) {
         sqlite.exec("ROLLBACK");
         throw error;

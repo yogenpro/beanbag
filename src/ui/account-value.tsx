@@ -41,7 +41,11 @@ export function AccountValue({
     point.historyMethods
       ? point.historyMethods
           .map((m) =>
-            m === "institution_export" ? "Institution export" : "Plaid Assets",
+            m === "institution_export"
+              ? "Institution export"
+              : m === "reconstructed"
+                ? "Reconstructed estimate"
+                : "Plaid Assets",
           )
           .join(" + ")
       : "Balance snapshot";
@@ -295,7 +299,7 @@ export function AccountValue({
               <div className="balance-selection" aria-live="polite">
                 <span>
                   {selected
-                    ? `${displayDate(selected.date)}${selected.historyMethods ? " · Imported" : ""}`
+                    ? `${displayDate(selected.date)}${selected.historyMethods?.includes("reconstructed") ? " · Estimated" : selected.historyMethods ? " · Imported" : ""}`
                     : "Choose a date"}
                 </span>
                 <strong>{selected ? amount(value(selected)) : ""}</strong>
@@ -331,6 +335,8 @@ export function AccountValue({
             {net ? " Brokerage values include borrowing." : ""} Changes include
             market movements and money entering or leaving; they are not
             investment returns. Gaps have no recorded balance.
+            {history.some((p) => p.historyMethods?.includes("reconstructed")) &&
+              " Reconstructed daily estimates assume same-day settlement. Reported balances take precedence."}
           </p>
           <details className="balance-details">
             <summary>History & freshness</summary>
@@ -346,6 +352,17 @@ export function AccountValue({
                 account values already include cash and debit balances. Plaid
                 Assets supplies calculated checking history where an export is
                 unavailable.
+              </p>
+            )}
+            {history.some((p) =>
+              p.historyMethods?.includes("reconstructed"),
+            ) && (
+              <p className="help">
+                Reconstructed brokerage values use complete account activity,
+                historical closing prices and fund transaction NAVs. Non-trading
+                days use the previous close. Same-day settlement can differ from
+                statements with unsettled trades. These estimates do not change
+                stock-transfer income or the latest reported balance.
               </p>
             )}
             <dl className="balance-source-times">

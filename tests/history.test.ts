@@ -93,6 +93,64 @@ const value = (
   source: "Invented institutional history",
 });
 describe("account-value history integration", () => {
+  it("keeps estimates separate, preserves reported priority in either order, and rejects missing assumptions", async () => {
+    const reconstruction = {
+      settlement: "same_day",
+      prices: "unadjusted_close_and_transaction_nav",
+      nonTradingDays: "previous_close",
+      evidenceSha256: "a".repeat(64),
+    } as const;
+    const estimated: HistoricalValue = {
+      ...value(accounts[1].id, "2026-08-12", 21000, "reconstructed"),
+      reconstruction,
+    };
+    const imported = [
+      value(accounts[0].id, "2026-08-12", 10000),
+      estimated,
+      value(accounts[1].id, "2026-08-12", 20000),
+    ];
+    for (const rows of [imported, [...imported].reverse()]) {
+      const report = balanceReport(
+        [],
+        accounts,
+        emptyBalanceHealth(),
+        period,
+        new Date(at),
+        rows,
+      );
+      expect(report.latest?.netWorthCents).toBe(30000);
+      expect(report.latest?.historyMethods).toEqual(["institution_export"]);
+    }
+    const { db, sqlite } = sqliteD1();
+    try {
+      for (const a of accounts)
+        sqlite
+          .prepare("INSERT INTO accounts(id,role,label,mask) VALUES(?,?,?,?)")
+          .run(a.id, a.role, a.label, a.mask);
+      const repo = new D1Ledger(db);
+      await repo.saveAccountValueHistory(imported);
+      await repo.saveAccountValueHistory(imported);
+      expect(await repo.accountValueHistory()).toHaveLength(3);
+      expect(
+        sqlite.prepare("SELECT COUNT(*) AS n FROM account_value_history").get()
+          ?.n,
+      ).toBe(2);
+      expect(
+        sqlite
+          .prepare("SELECT COUNT(*) AS n FROM account_value_reconstructions")
+          .get()?.n,
+      ).toBe(1);
+      await expect(
+        repo.saveAccountValueHistory([
+          { ...estimated, reconstruction: undefined },
+        ]),
+      ).rejects.toThrow();
+      expect(await repo.events()).toEqual([]);
+      expect(await repo.balanceSnapshots()).toEqual([]);
+    } finally {
+      sqlite.close();
+    }
+  });
   it("requires explicit mapping for ambiguous Amount exports and preserves account identity", () => {
     const csv = 'Date,Amount\n08/12/2026,"$1,234.56"\n';
     expect(() => accountValueCsv(csv, accounts[1], at)).toThrow(/column/);

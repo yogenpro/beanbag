@@ -206,7 +206,7 @@ describe("private local configuration and storage", () => {
       join(config.stateDirectory, "ledger.sqlite"),
     );
     sqlite.exec(
-      "DROP TABLE account_value_history; DROP TABLE balance_snapshots; DROP TABLE balance_refresh; PRAGMA user_version=1;",
+      "DROP TABLE account_value_reconstructions; DROP TABLE account_value_history; DROP TABLE balance_snapshots; DROP TABLE balance_refresh; PRAGMA user_version=1;",
     );
     sqlite.close();
     const upgraded = open();
@@ -220,7 +220,7 @@ describe("private local configuration and storage", () => {
           .prepare("PRAGMA user_version")
           .first<{ user_version: number }>()
       )?.user_version,
-    ).toBe(3);
+    ).toBe(4);
   });
   it("validates without writing data, reading inherited keys or making network requests", async () => {
     const fetch = vi
