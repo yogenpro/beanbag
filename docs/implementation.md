@@ -92,6 +92,24 @@ private operator CLI retain their separate roles. No new unattended job is enabl
 
 ## Verification
 
+The November 13 projections addition is browser-only. It starts from the latest
+saved net account value, calibrates external cash/share contributions and monthly
+flow-adjusted returns from usable whole months, and simulates a median path with
+selectable outcome bounds. Editable assumptions remain in browser memory and
+reset on reload. It adds no server mutation, persistence or schema. Missing
+coverage, unresolved flows and missing daily values withhold unsupported defaults;
+manual assumptions are explicit. Model details disclose nominal-dollar values,
+constant parameters, independent return/contribution draws and unmodeled risks.
+
+The updated credential-free suite passes 255 tests, including nine projection
+tests for cash/share separation, zero-flow months, data gaps, reconstructed
+provenance, known future-value arithmetic, repeatable percentiles, depletion and
+numeric limits. All 22 desktop/mobile browser checks pass, including forecast
+parameter updates without requests, navigation/reset behavior, missing history,
+unknown net balances, retries and responsive screenshots. Production UI build,
+privacy scan and Worker dry run pass. This verifies the local synthetic app;
+it does not establish deployment or live-data completeness.
+
 The local implementation passes 128 accounting, ingestion, balance history, SQLite persistence,
 Access/read-only API/encryption/webhook, credential isolation and publication-guard tests.
 Type checking, production UI build, Worker dry run and public-source privacy
