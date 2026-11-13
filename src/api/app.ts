@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
-import { assertPeriod, periodFor } from "../accounting/dates";
+import { assertPeriod, pacificToday, periodFor } from "../accounting/dates";
 import { report } from "../accounting/report";
 import { balanceReport } from "../accounting/balances";
 import { eventId } from "../accounting/types";
@@ -192,21 +192,41 @@ export function createApp(options: Options = {}) {
             "SELECT status FROM plaid_connections LIMIT 1",
           ).first<{ status: string }>()
         : null;
-    return c.json({
-      ...report(events, period),
-      trend: report(events, {
-        start: period.start.slice(0, 4) + "-01-01",
-        end: period.end,
-      }).months,
+    const now = new Date();
+    const balances = balanceReport(
+      snapshots,
       accounts,
-      balances: balanceReport(
-        snapshots,
-        accounts,
-        balanceHealth,
-        period,
-        new Date(),
-        historical,
-      ),
+      balanceHealth,
+      { start: "0001-01-01", end: "9999-12-31" },
+      now,
+      historical,
+    );
+    const selectedIds = new Set(accounts.map((account) => account.id));
+    const dates = [
+      pacificToday(now),
+      ...events
+        .filter(
+          (event) =>
+            event.status !== "removed" && selectedIds.has(event.accountId),
+        )
+        .map((event) => event.date),
+      ...historical
+        .filter((value) => selectedIds.has(value.accountId))
+        .map((value) => value.date),
+      ...balances.history.map((point) => point.date),
+    ].sort();
+    const selectedReport = report(events, period);
+    return c.json({
+      ...selectedReport,
+      trend: selectedReport.months,
+      availablePeriod: { start: dates[0], end: dates.at(-1)! },
+      accounts,
+      balances: {
+        ...balances,
+        history: balances.history.filter(
+          (point) => point.date >= period.start && point.date <= period.end,
+        ),
+      },
       coverage,
       illustrative: c.get("demo"),
       connectionStatus: c.get("demo")

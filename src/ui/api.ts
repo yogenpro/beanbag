@@ -7,7 +7,9 @@ import type {
 } from "../accounting/types";
 import type { Report } from "../accounting/report";
 import type { BalanceReport } from "../accounting/balances";
+import type { Period } from "../accounting/dates";
 export type Dashboard = Report & {
+  availablePeriod: Period;
   balances: BalanceReport;
   accounts: Account[];
   coverage: Coverage[];

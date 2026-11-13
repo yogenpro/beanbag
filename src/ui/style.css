@@ -636,23 +636,22 @@ main:focus {
   border-color: var(--accent-hover);
 }
 .period-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  gap: 12px;
   margin-bottom: 24px;
 }
 .period-presets {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: min(100%, 740px);
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--field);
 }
 .period-presets button {
-  min-height: 34px;
-  padding: 7px 13px;
+  min-height: 40px;
+  padding: 8px 6px;
   border: 1px solid transparent;
   border-radius: 5px;
   font-size: 0.86rem;
@@ -678,20 +677,36 @@ main:focus {
 }
 .period-label svg {
   color: var(--muted);
+  flex-shrink: 0;
 }
-.custom-period {
+.period-selection {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
 }
-.custom-period label {
+.period-picker {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   margin: 0;
-}
-.custom-period input {
-  max-width: 150px;
-  min-height: 38px;
-  padding: 8px;
+  max-width: 100%;
   font-size: 0.86rem;
+  color: var(--secondary);
+}
+.period-picker select {
+  width: 240px;
+  min-width: 0;
+  min-height: 40px;
+  font-size: 0.86rem;
+}
+@media (max-width: 1000px) {
+  .period-presets {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 .notice {
   display: flex;
@@ -1015,12 +1030,18 @@ main:focus {
   padding-bottom: 34px;
   font-variant-numeric: tabular-nums;
 }
+.bars-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
 .bars {
   position: relative;
   display: flex;
-  flex: 1;
+  height: 100%;
+  width: max-content;
+  min-width: 100%;
   justify-content: space-around;
-  min-width: 0;
   gap: 8px;
 }
 .bars::before,
@@ -1043,8 +1064,8 @@ main:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 44px;
+  min-width: 44px;
   max-width: 72px;
   padding: 0 4px;
   height: 100%;
@@ -1781,9 +1802,14 @@ pre {
     justify-content: space-between;
   }
   .period-presets button {
-    padding: 8px;
+    padding: 8px 6px;
     font-size: 0.86rem;
-    min-height: 36px;
+    min-height: 44px;
+    white-space: normal;
+    line-height: 1.35;
+  }
+  .period-picker select {
+    min-height: 44px;
   }
   .period-label {
     font-size: 0.86rem;
@@ -2062,9 +2088,6 @@ pre {
   .detail-grid {
     gap: 16px 12px;
   }
-  .custom-period input {
-    max-width: 145px;
-  }
 }
 @media (max-width: 374px) {
   .page-heading h1 {
@@ -2095,10 +2118,6 @@ pre {
     padding-right: 3px;
     white-space: normal;
     line-height: 1.35;
-  }
-  .period-presets {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .income-parts {
     gap: 16px;

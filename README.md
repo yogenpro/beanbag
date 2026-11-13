@@ -75,6 +75,15 @@ Money uses integer cents. Exact decimal quantities and prices use BigInt-backed
 arithmetic, rounding half away from zero once per event. Institution date-only
 posting dates remain unchanged; date presets use America/Los_Angeles.
 
+The range tabs are Last 1 month (default), Last 3 months, Last 6 months, Year to
+date, Last year and Max. The first three default to inclusive rolling calendar
+months ending today; their dropdowns also offer calendar months, quarters and
+half-years. Current calendar periods end today. Year to date offers years through
+the same calendar day (clamping leap days); Last year defaults to the previous
+complete calendar year. Max covers all saved dates, including imported history.
+All charts and totals follow the selected period; the latest account value stays
+independent of it.
+
 Every total has a source drilldown. Review decisions include rationale, reviewer,
 timestamp and source revision. A provider correction preserves the decision and
 raises a review conflict. Sources and classification remain separate. Normal
