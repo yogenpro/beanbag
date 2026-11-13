@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   statSync,
@@ -26,6 +27,7 @@ import {
   connection,
 } from "../src/local/link";
 import { openLocalStore, type LocalStore } from "../src/local/store";
+import { privateLocation } from "../src/local/files";
 import { decryptToken } from "../src/providers/plaid/secrets";
 import {
   ProviderError,
@@ -133,7 +135,23 @@ async function invoke(args: string[], settings = env) {
   return { status, output };
 }
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), "beanbag-local-test-"));
+  // Build containers can supply TMPDIR under a parent owned by another UID.
+  // Fixtures must satisfy the real private-path guard, just like operator data.
+  let selected: string | undefined;
+  for (const base of new Set([tmpdir(), "/tmp", "/var/tmp"])) {
+    let candidate: string | undefined;
+    try {
+      candidate = mkdtempSync(join(realpathSync(base), "beanbag-local-test-"));
+      privateLocation(project, candidate);
+      selected = candidate;
+      break;
+    } catch {
+      if (candidate) rmSync(candidate, { recursive: true, force: true });
+    }
+  }
+  if (!selected)
+    throw new Error("No trusted temporary directory for local CLI fixtures");
+  directory = selected;
   mkdirSync(join(directory, "config"), { mode: 0o700 });
   env = {
     BEANBAG_LOCAL_ENV_FILE: join(directory, "config/plaid.env"),
