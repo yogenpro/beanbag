@@ -95,3 +95,36 @@ export function projectionFixture(): Dashboard {
     trend: summary.months,
   };
 }
+
+/** Older invented observations deliberately sit beyond the five-year window. */
+export function longProjectionFixture(): Dashboard {
+  const fixture = projectionFixture();
+  const older = projectionFixture();
+  const earlierDate = (date: string) =>
+    `${Number(date.slice(0, 4)) - 5}${date.slice(4)}`;
+  fixture.records.push(
+    ...older.records
+      .filter((record) => record.date < "2026-05-01")
+      .map((record) => ({
+        ...record,
+        id: `older-${record.id}`,
+        sourceId: `older-${record.sourceId}`,
+        date: earlierDate(record.date),
+      })),
+  );
+  fixture.balances.history.unshift(
+    ...older.balances.history
+      .filter((point) => point.date < "2026-05-01")
+      .map((point) => ({
+        ...point,
+        date: earlierDate(point.date),
+        asOfDate: earlierDate(point.date),
+        capturedAt: earlierDate(point.capturedAt),
+      })),
+  );
+  fixture.availablePeriod.start = "2020-12-31";
+  fixture.coverage.forEach((coverage) => {
+    coverage.history!.start = "2021-01-01";
+  });
+  return fixture;
+}

@@ -1,5 +1,87 @@
 import { expect, test } from "@playwright/test";
-import { projectionFixture } from "../projection-fixtures";
+import {
+  longProjectionFixture,
+  projectionFixture,
+} from "../projection-fixtures";
+
+test("Max uses all saved history beyond five years and keeps assumptions local", async ({
+  page,
+}) => {
+  const fixture = longProjectionFixture();
+  const requests: string[] = [],
+    writes: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/")) requests.push(request.url());
+    if (!["GET", "HEAD"].includes(request.method()))
+      writes.push(request.method());
+  });
+  await page.route("**/api/report*", (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const start = params.get("start") ?? "0001-01-01";
+    const end = params.get("end") ?? "9999-12-31";
+    return route.fulfill({
+      json: {
+        ...fixture,
+        records: fixture.records.filter(
+          (record) => record.date >= start && record.date <= end,
+        ),
+        balances: {
+          ...fixture.balances,
+          history: fixture.balances.history.filter(
+            (point) => point.date >= start && point.date <= end,
+          ),
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await page.locator("#projections-tab").click();
+  await expect(
+    page.getByRole("img", { name: /Projected account value/ }),
+  ).toBeVisible();
+  const requestCount = requests.length;
+  expect(
+    requests.some(
+      (url) => new URL(url).searchParams.get("start") === "0001-01-01",
+    ),
+  ).toBe(true);
+  await page.getByLabel("History window").selectOption("max");
+  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("75");
+  await expect(page.getByLabel("Monthly net share transfers")).toHaveValue(
+    "50",
+  );
+  await expect(
+    page.getByText(
+      /Based on 64 usable contribution months and 8 usable return months out of the 64 available months/,
+    ),
+  ).toBeVisible();
+  await expect(page.locator(".projection-months")).toContainText("2021-01");
+  await expect(page.locator(".projection-summary dd").first()).toHaveText(
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(fixture.balances.latest!.netWorthCents! / 100),
+  );
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement)?.blur();
+    window.scrollTo(0, 0);
+  });
+  await page.screenshot({
+    path: `test-results/projections-max-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByLabel("History window").selectOption("60");
+  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("40");
+  await page.getByLabel("Monthly net cash flow").fill("1234");
+  await page.getByLabel("History window").selectOption("max");
+  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("1234");
+  expect(requests).toHaveLength(requestCount);
+  expect(writes).toEqual([]);
+  await page.locator("#overview-tab").click();
+  await page.locator("#projections-tab").click();
+  await expect(page.getByLabel("History window")).toHaveValue("max");
+  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("1234");
+});
 
 test("projection assumptions update the graph locally, survive tab changes, and never write", async ({
   page,

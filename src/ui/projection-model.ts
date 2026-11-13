@@ -38,7 +38,10 @@ export type ProjectionCalibration = {
   flowMonths: string[];
   returnMonths: string[];
   reconstructed: boolean;
+  historyMonths: number;
 };
+
+export type ProjectionLookback = number | "max";
 
 /** Complete calendar months only; absent months are never silently zero-filled.
  * The anchor month is excluded, even when its last observation is month-end.
@@ -46,7 +49,7 @@ export type ProjectionCalibration = {
  */
 export function calibrateProjection(
   data: Dashboard,
-  lookback: number,
+  lookback: ProjectionLookback,
 ): ProjectionCalibration {
   const result: ProjectionCalibration = {
     defaults: {
@@ -59,14 +62,27 @@ export function calibrateProjection(
     flowMonths: [],
     returnMonths: [],
     reconstructed: false,
+    historyMonths: 0,
   };
   const anchor = data.balances.latest?.date;
   if (!anchor) return result;
+  const monthIndex = (date: string) =>
+    Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7)) - 1;
+  // Before the common loaded transaction window, neither contributions nor
+  // flow-adjusted returns can be estimated. Avoid treating earlier gaps as zero.
+  const historyStart =
+    transactionCoverage(data.coverage, data.availablePeriod).start ??
+    data.availablePeriod.start;
+  const months =
+    lookback === "max"
+      ? Math.max(0, monthIndex(anchor) - monthIndex(historyStart))
+      : lookback;
+  result.historyMonths = months;
   const cash: number[] = [],
     shares: number[] = [],
     logs: number[] = [];
   const ids = new Set(data.accounts.map((account) => account.id));
-  for (let offset = -lookback; offset < 0; offset++) {
+  for (let offset = -months; offset < 0; offset++) {
     const period = monthBounds(anchor, offset);
     if (transactionCoverage(data.coverage, period).status !== "available")
       continue;

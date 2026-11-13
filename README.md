@@ -147,9 +147,10 @@ or new background price job.
 
 Projections starts from the latest saved combined net value and runs entirely in
 the browser using saved records from the existing read-only report API. Choose a
-12-month, 3-year or 5-year history window and a 1–30-year horizon. Adjust monthly
-net cash flow, monthly net share transfers, annual geometric growth, return
-volatility and contribution variability. Changes update the graph immediately.
+12-month, 3-year, 5-year or Max (all available) history window and a 1–30-year
+horizon. Adjust monthly net cash flow, monthly net share transfers, annual
+geometric growth, return volatility and contribution variability. Changes update
+the graph immediately.
 Inputs stay in browser memory across dashboard tabs and reset on page reload;
 there are no server writes, cookies or local-storage records for scenarios.
 
