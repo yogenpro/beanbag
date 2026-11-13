@@ -121,14 +121,27 @@ Plaid Assets checking history. Export dates are preserved as supplied; collectio
 time stays separate. Already-net brokerage values are used directly, so borrowing
 is not deducted twice. Institution exports take precedence over calculated Assets
 history for the same account/date. A total requires both selected accounts on the
-same date; missing values are not filled with zero. Past holdings/quotes are not
-reconstructed. Changes
+same date; missing values are not filled with zero. Older brokerage gaps can use
+explicitly labelled daily estimates reconstructed from complete activity and
+historical closes under a same-day settlement convention. Reported balances
+take precedence. Changes
 include market moves and external flows, not just investment returns. Stock
 receipt income remains fixed at its reviewed historical value.
 
 Imported history lives in `account_value_history` (migration
 `0003_account_history.sql`), separate from immutable balance observations and
 financial events. The latest value remains independent of the reporting period.
+Derived estimates live separately in `account_value_reconstructions` (migration
+`0004_reconstructed_history.sql`). The portable replay includes trades, dividends,
+interest and fees for balance calculations, while income/expense rules remain
+unchanged. It uses exact share quantities, as-traded closes with later splits
+reversed, actual share splits and the previous close on non-trading days. Sparse
+money-fund prices require explicit issuer transaction-NAV evidence. Price gaps,
+short positions and incomplete inputs fail instead of inventing a balance.
+Net cash already includes cash debits, so borrowing is never deducted twice.
+Private operator tooling retains raw price responses, replayed positions,
+statement comparisons and evidence hashes; there is no browser import control
+or new background price job.
 
 ## Status and the real-data feasibility gate
 

@@ -15,6 +15,17 @@ each snapshot's reported borrowing. No confirmation workflow or owner override
 is needed; missing provider borrowing remains unknown.
 Older checklist entries below describe the original milestone and its gates.
 
+Daily brokerage reconstruction now provides explicit estimates for historical
+gaps under the owner's same-day settlement convention. The exact-decimal replay
+uses all account activity and as-traded historical prices, handles share splits,
+and fails on missing prices or unsupported short positions. Explicit issuer NAV
+evidence supports stable money funds. Derived values use a separate additive
+table and preserve reported-value priority, latest balances and receipt income.
+The read-only chart labels estimates and explains their settlement assumption.
+The suite now passes 204 tests and ten desktop/mobile browser checks, including
+derived-history persistence, reported priority, borrowing, fractional quantities,
+split handling, prior-close selection and invalid evidence rejection.
+
 - [x] M0: Worker + React + Hono scaffold, D1 migration and synthetic local spike.
 - [ ] M0 external: independent Plaid consent, product/plan access and one genuine
       incoming securities transfer verified against institution evidence.

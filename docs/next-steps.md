@@ -125,7 +125,7 @@ chart. The working tree now includes immutable balance observations, exact-cent
 aggregation, brokerage borrowing handling, independent balance health and an
 interactive Overview chart. Latest value is independent of the reporting period;
 history combines saved Pacific-day observations with imported institution-dated
-values. No past balance is inferred from transactions. The first private snapshot
+values. At that stage, no past balance was inferred from transactions. The first private snapshot
 is saved; reconciliation notes and
 any provider/owner discrepancy remain in private evidence, not public fixtures.
 
@@ -149,6 +149,24 @@ separate. No holdings reconstruction or public-price lookup is part of this path
 Actual files, evidence, backup/restore receipts and deployment validation remain
 private. Infra must back up and review the additive schema before approving the
 new migration hash and importing the bounded private artifact.
+
+The owner subsequently approved **instant settlement** for daily brokerage
+reconstruction and authorized obtaining public historical closing prices. This
+supersedes the earlier export-only choice for missing daily values. The portable
+replay now uses complete activity, exact quantities, historical as-traded closes,
+corporate actions, prior closes on non-trading days and documented stable fund
+transaction NAVs. This balance calculation includes trading, dividends, interest
+and fees without changing the external-flow reporting convention or share-transfer
+income valuations. Net cash includes borrowing exactly once.
+
+Migration `0004_reconstructed_history.sql` adds a separate estimates table.
+Institution exports and statement closes keep priority; current reported balances
+remain independent. The chart/table labels estimates and discloses same-day
+settlement. Actual price downloads, native inputs, holdings, reconciliation
+differences, encrypted backups and import/deployment receipts remain private.
+Private infra owns schema approval and bounded import after verified recovery.
+No polling or public write route is added. Historical quote normalization must
+reverse later splits and must never substitute dividend-adjusted prices.
 
 The updated backend suite has 127 passing tests. The balance-view browser checks
 cover keyboard snapshot selection, the daily table, period changes that preserve

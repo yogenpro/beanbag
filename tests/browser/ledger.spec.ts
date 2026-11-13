@@ -481,6 +481,8 @@ test("institution-dated net history includes borrowing once and stays read-only"
   date.setUTCDate(date.getUTCDate() - 1);
   previous.date = date.toISOString().slice(0, 10);
   previous.asOfDate = previous.date;
+  previous.historyMethods = ["institution_export", "reconstructed"];
+  previous.provider = "Illustrative activity and historical prices";
   fixture.balances = {
     ...fixture.balances,
     latest,
@@ -519,13 +521,31 @@ test("institution-dated net history includes borrowing once and stays read-only"
   await balances.getByText("History & freshness", { exact: true }).click();
   await expect(
     balances.getByRole("cell", { name: "Institution export", exact: true }),
-  ).toHaveCount(2);
+  ).toHaveCount(1);
+  await expect(
+    balances.getByRole("cell", {
+      name: "Institution export + Reconstructed estimate",
+      exact: true,
+    }),
+  ).toHaveCount(1);
+  await expect(
+    balances.getByText(
+      /Reconstructed daily estimates assume same-day settlement/,
+    ),
+  ).toBeVisible();
   await expect(balances.getByText(/Imported dates follow/)).toBeVisible();
   await balances.getByRole("slider", { name: "History date" }).focus();
   await page.keyboard.press("Home");
   await expect(
     balances.getByRole("slider", { name: "History date" }),
   ).toHaveValue("0");
+  await expect(balances.locator(".balance-selection")).toContainText(
+    "Estimated",
+  );
+  await page.screenshot({
+    path: `test-results/reconstructed-history-${test.info().project.name}.png`,
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
   expect(writes).toEqual([]);
 });
