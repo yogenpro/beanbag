@@ -20,7 +20,58 @@ describe("daily time-weighted return", () => {
   it("geometrically links daily returns and never annualizes a short period", () => {
     expect(calculate([10000, 11000, 10450]).rate).toBeCloseTo(0.045, 12);
     expect(calculate([10000, 11000]).rate).toBeCloseTo(0.1, 12);
+    expect(calculate([10000, 11000]).annualizedRate).toBeNull();
   });
+  const longPeriod = (start: string, end: string, endingValue = 1210000) => {
+    const days = (Date.parse(end) - Date.parse(start)) / 86_400_000;
+    return dailyTimeWeightedReturn(
+      Array.from({ length: days + 1 }, (_, i) => ({
+        date: new Date(Date.parse(start) + i * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+        valueCents: Math.round(1000000 + ((endingValue - 1000000) * i) / days),
+      })),
+      [],
+      start,
+      end,
+    );
+  };
+  it("retains cumulative TWR and compounds a multi-year annualized return", () => {
+    const result = longPeriod("2024-12-31", "2026-12-31");
+    expect(result.rate).toBeCloseTo(0.21, 12);
+    expect(result.annualizedRate).toBeCloseTo(0.1, 12);
+    expect(result.days).toBe(730);
+  });
+  it.each([
+    ["2023-02-28", "2024-02-28", false],
+    ["2023-03-01", "2024-03-01", false],
+    ["2024-02-29", "2025-02-28", false],
+    ["2024-02-29", "2025-03-01", true],
+    ["2025-01-01", "2026-01-02", true],
+  ])(
+    "annualizes only beyond the calendar anniversary: %s to %s",
+    (start, end, eligible) => {
+      const result = longPeriod(start, end);
+      if (eligible)
+        expect(result.annualizedRate).toBeCloseTo(
+          Math.pow(1.21, 365 / result.days) - 1,
+          12,
+        );
+      else expect(result.annualizedRate).toBeNull();
+    },
+  );
+  it.each([
+    [1000000, 0],
+    [810000, -0.1],
+    [0, -1],
+  ])(
+    "supports flat, negative and complete-loss annualized performance (%s)",
+    (end, expected) => {
+      expect(
+        longPeriod("2024-12-31", "2026-12-31", end).annualizedRate,
+      ).toBeCloseTo(expected, 12);
+    },
+  );
   it("removes capital contributions and withdrawals from performance", () => {
     const result = calculate(
       [10000, 22000, 10900],
@@ -141,13 +192,11 @@ describe("daily time-weighted return", () => {
       date: `2026-01-${String(i + 1).padStart(2, "0")}`,
       valueCents: 1,
     }));
-    const flows = series
-      .slice(1)
-      .map((v) => ({
-        date: v.date,
-        inflowCents: 0,
-        outflowCents: Number.MAX_SAFE_INTEGER - 1,
-      }));
+    const flows = series.slice(1).map((v) => ({
+      date: v.date,
+      inflowCents: 0,
+      outflowCents: Number.MAX_SAFE_INTEGER - 1,
+    }));
     expect(
       dailyTimeWeightedReturn(
         series,

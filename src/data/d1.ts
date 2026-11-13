@@ -1,5 +1,8 @@
 import { classify } from "../accounting/classify";
-import { transferPricing } from "../providers/plaid/normalize";
+import {
+  bankPaymentCategory,
+  transferPricing,
+} from "../providers/plaid/normalize";
 import { validateHistory, type HistoricalValue } from "../accounting/history";
 import {
   emptyBalanceHealth,
@@ -138,7 +141,10 @@ export class D1Ledger implements LedgerRepository {
       .prepare("SELECT record_json, raw_json FROM source_records ORDER BY id")
       .all<{ record_json: string; raw_json: string }>();
     return rows.results.map((row) =>
-      transferPricing(JSON.parse(row.record_json), row.raw_json),
+      bankPaymentCategory(
+        transferPricing(JSON.parse(row.record_json), row.raw_json),
+        row.raw_json,
+      ),
     );
   }
   async events(): Promise<FinancialEvent[]> {

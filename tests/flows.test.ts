@@ -6,9 +6,11 @@ import { MemoryLedger } from "../src/data/memory";
 import { reclassify } from "../src/data/repository";
 import {
   normalizeInvestment,
+  normalizeBank,
+  bankPaymentCategory,
   transferPricing,
 } from "../src/providers/plaid/normalize";
-import { accounts, bank, investment, rawInvestment } from "./fixtures";
+import { accounts, bank, investment, rawInvestment, rawBank } from "./fixtures";
 import { sqliteD1 } from "./sqlite-d1";
 
 const period = { start: "2026-08-01", end: "2026-08-31" };
@@ -31,6 +33,97 @@ const cash = (amount: number) =>
     direction: "unknown",
     evidence: undefined,
   });
+
+describe("payment category details", () => {
+  it.each([
+    ["CREDIT_CARD_PAYMENT", "Credit-card payments"],
+    ["OTHER_PAYMENT", "Other payments"],
+    ["MORTGAGE_PAYMENT", "Mortgage payments"],
+    ["CAR_PAYMENT", "Auto loan payments"],
+    ["UNRECOGNIZED", "Loan payments (provider category)"],
+  ])(
+    "uses the provider detail %s without changing expense accounting",
+    async (detail, category) => {
+      const { record } = await normalizeBank(
+        rawBank({
+          name: "Invented ACH payment",
+          amount: "125.50",
+          personal_finance_category: {
+            primary: "LOAN_PAYMENTS",
+            detailed: `LOAN_PAYMENTS_${detail}`,
+          },
+        }),
+      );
+      expect(classify(record, accounts)).toMatchObject({
+        kind: "spending",
+        status: "confirmed",
+        amountCents: 12550,
+        category,
+      });
+    },
+  );
+  it("reads matched legacy evidence without updating sources or cached events", async () => {
+    const { db, sqlite } = sqliteD1();
+    try {
+      for (const a of accounts)
+        sqlite
+          .prepare("INSERT INTO accounts(id,role,label,mask) VALUES(?,?,?,?)")
+          .run(a.id, a.role, a.label, a.mask);
+      const source = bank({
+        description: "Invented ACH payment",
+        amountCents: -12550,
+        category: "loan payments",
+      });
+      const raw = rawBank({
+        transaction_id: source.id,
+        name: source.description,
+        amount: "125.50",
+        personal_finance_category: {
+          primary: "LOAN_PAYMENTS",
+          detailed: "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT",
+        },
+      });
+      sqlite
+        .prepare(
+          "INSERT INTO source_records(id,source_kind,provider_id,account_id,event_date,revision,record_json,raw_json) VALUES(?,?,?,?,?,?,?,?)",
+        )
+        .run(
+          "bank:" + source.id,
+          "bank",
+          source.id,
+          source.accountId,
+          source.date,
+          source.revision,
+          JSON.stringify(source),
+          JSON.stringify(raw),
+        );
+      const before = sqlite.prepare("SELECT total_changes() AS n").get()!.n;
+      const repo = new D1Ledger(db);
+      expect((await repo.events())[0]).toMatchObject({
+        category: "Credit-card payments",
+        kind: "spending",
+        amountCents: 12550,
+        revision: "v1",
+      });
+      expect(sqlite.prepare("SELECT total_changes() AS n").get()!.n).toBe(
+        before,
+      );
+      expect(
+        bankPaymentCategory(
+          source,
+          JSON.stringify({ ...raw, transaction_id: "different" }),
+        ),
+      ).toEqual(source);
+      expect(
+        bankPaymentCategory(source, JSON.stringify({ ...raw, amount: "999" })),
+      ).toEqual(source);
+      expect(bankPaymentCategory(source, "invalid JSON")).toEqual(source);
+      expect(source.category).toBe("loan payments");
+    } finally {
+      sqlite.close();
+    }
+  });
+});
 
 describe("external flows across the tracked account pair", () => {
   it.each(accounts)(

@@ -33,6 +33,28 @@ function date(value: unknown): string {
   return v;
 }
 
+function bankCategory(raw: JsonRecord): string | undefined {
+  const primary = raw.personal_finance_category?.primary;
+  if (typeof primary !== "string") return undefined;
+  // Plaid groups credit-card payments under LOAN_PAYMENTS. Keep the supported
+  // detail in the reporting label instead of implying every payment is a loan.
+  if (primary === "LOAN_PAYMENTS") {
+    const labels: Record<string, string> = {
+      LOAN_PAYMENTS_CREDIT_CARD_PAYMENT: "Credit-card payments",
+      LOAN_PAYMENTS_OTHER_PAYMENT: "Other payments",
+      LOAN_PAYMENTS_CAR_PAYMENT: "Auto loan payments",
+      LOAN_PAYMENTS_MORTGAGE_PAYMENT: "Mortgage payments",
+      LOAN_PAYMENTS_PERSONAL_LOAN_PAYMENT: "Personal loan payments",
+      LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT: "Student loan payments",
+    };
+    const detail = raw.personal_finance_category?.detailed;
+    return typeof detail === "string" && Object.hasOwn(labels, detail)
+      ? labels[detail]
+      : "Loan payments (provider category)";
+  }
+  return primary.replaceAll("_", " ").toLowerCase();
+}
+
 export async function normalizeBank(
   raw: JsonRecord,
 ): Promise<{ record: BankSource; raw: string }> {
@@ -49,14 +71,29 @@ export async function normalizeBank(
       typeof raw.pending_transaction_id === "string"
         ? raw.pending_transaction_id
         : undefined,
-    category:
-      typeof raw.personal_finance_category?.primary === "string"
-        ? raw.personal_finance_category.primary
-            .replaceAll("_", " ")
-            .toLowerCase()
-        : undefined,
+    category: bankCategory(raw),
   });
   return { record, raw: rawJson(raw) };
+}
+
+/** Recover category detail on reads; never rewrite saved provider evidence. */
+export function bankPaymentCategory(source: Source, raw: string): Source {
+  if (source.kind !== "bank" || source.category !== "loan payments")
+    return source;
+  try {
+    const evidence = parse(raw) as JsonRecord;
+    if (
+      evidence?.transaction_id !== source.id ||
+      evidence.account_id !== source.accountId ||
+      evidence.date !== source.date ||
+      evidence.personal_finance_category?.primary !== "LOAN_PAYMENTS" ||
+      -cents(decimalText(evidence.amount)) !== source.amountCents
+    )
+      return source;
+    return { ...source, category: bankCategory(evidence) };
+  } catch {
+    return source;
+  }
 }
 
 export async function normalizeInvestment(

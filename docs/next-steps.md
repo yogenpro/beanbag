@@ -179,9 +179,13 @@ are needed. The API and private offline report share the calculation; ordinary
 checked-main deployment uses the existing private Cloudflare adapter.
 
 Time-weighted return extends that comparison using daily net values and the same
-external cash/share convention. It is a nonannualized estimate with start-of-day
-inflows and end-of-day outflows; missing daily data or undefined capital bases
-withhold it. This adds no stored financial values, schema, provider requests or
+external cash/share convention. Show the cumulative daily estimate inline with
+investment gain/loss, and an additional compound annualized rate only when the
+actual comparison exceeds one calendar year (actual elapsed days/365). Inflows
+start the day and outflows end it; missing daily data or undefined capital bases
+withhold it. Expense-breakdown links filter by both kind and category; saved
+provider detail distinguishes credit-card payments from the broad loan-payment
+label without changing amounts. This adds no stored financial values, schema, provider requests or
 schedules. Security and recovery explanations must distinguish the live D1
 ledger, private local source evidence, runtime secrets, encrypted operator
 archives and Cloudflare's plan-dependent Time Travel window. Local restore
