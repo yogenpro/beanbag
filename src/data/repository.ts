@@ -1,6 +1,7 @@
 import { classify, transferMatches } from "../accounting/classify";
 import { decimalIdentity, positiveDecimal } from "../accounting/money";
 import type { BalanceSnapshot, BalanceHealth } from "../accounting/balances";
+import type { HistoricalValue } from "../accounting/history";
 import {
   eventId,
   type Account,
@@ -22,6 +23,8 @@ export type SyncCommit = {
   reconcileWindow?: { start: string; end: string; presentIds: string[] };
 };
 export interface LedgerRepository {
+  accountValueHistory(): Promise<HistoricalValue[]>;
+  saveAccountValueHistory(values: HistoricalValue[]): Promise<void>;
   balanceSnapshots(): Promise<BalanceSnapshot[]>;
   balanceHealth(): Promise<BalanceHealth>;
   saveBalanceSnapshot(snapshot: BalanceSnapshot): Promise<void>;

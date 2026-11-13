@@ -169,6 +169,31 @@ afterEach(() => {
 });
 
 describe("private local configuration and storage", () => {
+  it("imports explicitly mapped daily values privately without contacting a provider or changing events", async () => {
+    const store = open();
+    const { api, post } = fakeApi();
+    await beginLink(store, api);
+    await completeLink(store, api, config);
+    close(store);
+    const file = join(directory, "config", "daily-values.csv");
+    writeFileSync(file, 'Date,Amount\n08/12/2026,"$12,345.67"\n', {
+      mode: 0o600,
+    });
+    const before = post.mock.calls.length;
+    expect(
+      (await invoke(["import-history", "brokerage", file, "Amount"])).status,
+    ).toBe(0);
+    const imported = open();
+    expect(await imported.repo.accountValueHistory()).toMatchObject([
+      {
+        accountId: accounts[1].id,
+        netValueCents: 1234567,
+        method: "institution_export",
+      },
+    ]);
+    expect(await imported.repo.events()).toEqual([]);
+    expect(post.mock.calls).toHaveLength(before);
+  });
   it("upgrades a version-one local ledger without replacing credentials, accounts or sources", async () => {
     const original = open();
     const { api } = fakeApi();
@@ -181,7 +206,7 @@ describe("private local configuration and storage", () => {
       join(config.stateDirectory, "ledger.sqlite"),
     );
     sqlite.exec(
-      "DROP TABLE balance_snapshots; DROP TABLE balance_refresh; PRAGMA user_version=1;",
+      "DROP TABLE account_value_history; DROP TABLE balance_snapshots; DROP TABLE balance_refresh; PRAGMA user_version=1;",
     );
     sqlite.close();
     const upgraded = open();
@@ -195,7 +220,7 @@ describe("private local configuration and storage", () => {
           .prepare("PRAGMA user_version")
           .first<{ user_version: number }>()
       )?.user_version,
-    ).toBe(2);
+    ).toBe(3);
   });
   it("validates without writing data, reading inherited keys or making network requests", async () => {
     const fetch = vi

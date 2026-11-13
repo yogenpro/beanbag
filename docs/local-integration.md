@@ -119,9 +119,32 @@ legacy attestation metadata is preserved but does not override reported balances
 No unattended collection is enabled by these commands. Future explicit syncs
 and the hosted scheduled entry point collect new observations when run.
 
-Existing local ledgers migrate from version 1 to version 2 transactionally, after
-their configuration/key checks, preserving sources, decisions and credentials.
-Private infra must apply both portable migrations before running the new Worker.
+Private daily account-value CSVs can be imported locally with:
+
+```sh
+npm run local -- import-history checking /private/checking-values.csv Amount
+npm run local -- import-history brokerage /private/brokerage-values.csv Amount
+```
+
+The optional final argument explicitly maps a value column such as `Amount`;
+ambiguous transaction-amount columns are never assumed to be balances. Select only
+the tracked account when exporting. Brokerage inputs must be total net account
+values, including cash/debit balances, rather than securities-only market values.
+Inputs must be owner-only files in a private directory outside every Git checkout.
+Imports use exact USD cents, reject duplicate/invalid dates and preserve source
+records. The local ledger upgrades to schema version 3 without replacing its key,
+connection, prior snapshots or transaction records.
+
+The private operator can also normalize the selected checking account from an
+authorized Plaid Asset Report with `checkingAssetValues`. Assets requires its
+own product initialization/consent and may have report/history fees; preserve
+the existing Item and obtain only the needed report. Hosted D1 imports and schema
+approval remain private infra responsibilities. Local CLI writes do not replicate
+automatically into hosted D1.
+
+Existing local ledgers migrate through version 3 transactionally, after their
+configuration/key checks, preserving sources, decisions and credentials.
+Private infra must apply all three portable migrations before running the new Worker.
 
 `status` shows environment, connection/session presence, product success times
 and safe error codes. It does not print account IDs, masks, amounts or source

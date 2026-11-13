@@ -114,15 +114,16 @@ All dashboard API mutations are rejected for every identity (including admins).
 belong to private operator tooling or separately authenticated provider ingestion.
 Hosted consent/repair provisioning needs a private operator path before deployment;
 do not restore browser write routes to complete it. The current automated suite
-has 170 passing tests, including rejection of writes without database/provider
-effects. Four desktop/mobile checks cover read-only browsing and no write requests.
+has 183 passing tests, including rejection of writes without database/provider
+effects. Six desktop/mobile checks cover read-only browsing, institution-dated net values and no write requests.
 
 The owner also requested current tracked-account value/net worth and a history
 chart. The working tree now includes immutable balance observations, exact-cent
 aggregation, brokerage borrowing handling, independent balance health and an
 interactive Overview chart. Latest value is independent of the reporting period;
-history shows only saved Pacific-day observations. No past balance is inferred
-from transactions. The first private snapshot is saved; reconciliation notes and
+history combines saved Pacific-day observations with imported institution-dated
+values. No past balance is inferred from transactions. The first private snapshot
+is saved; reconciliation notes and
 any provider/owner discrepancy remain in private evidence, not public fixtures.
 
 The private CLI `report` also writes `account-values.html` outside Git, reusing
@@ -132,6 +133,19 @@ It is separate from the illustrative browser and updates only when regenerated.
 Balance collection uses `npm run local -- balances` or an explicit `sync`.
 There is no new background job. `0002_balances.sql` must be applied by private
 infra before the new Worker is deployed; the local CLI migrates its own ledger.
+
+The owner subsequently chose native daily account-value exports for the history
+backfill, and authorized a Plaid Assets checking report. The current source adds
+`0003_account_history.sql`, private CSV import helpers and a separate history
+repository. Institution exports win over calculated Assets values on the same
+account/date. Already-net brokerage values are not reduced by borrowing again.
+Dates follow the institution's file, while import times stay actual collection
+times. The chart/table combines only matching dates from the selected pair and
+labels imported sources. Current observations and all income/expense records stay
+separate. No holdings reconstruction or public-price lookup is part of this path.
+Actual files, evidence, backup/restore receipts and deployment validation remain
+private. Infra must back up and review the additive schema before approving the
+new migration hash and importing the bounded private artifact.
 
 The updated backend suite has 127 passing tests. The balance-view browser checks
 cover keyboard snapshot selection, the daily table, period changes that preserve

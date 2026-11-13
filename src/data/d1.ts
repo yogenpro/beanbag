@@ -1,5 +1,6 @@
 import { classify } from "../accounting/classify";
 import { transferPricing } from "../providers/plaid/normalize";
+import { validateHistory, type HistoricalValue } from "../accounting/history";
 import {
   emptyBalanceHealth,
   type BalanceSnapshot,
@@ -25,6 +26,29 @@ import {
 export class ConflictError extends Error {}
 export class D1Ledger implements LedgerRepository {
   constructor(readonly db: D1Database) {}
+  accountValueHistory() {
+    return this.jsonRows<HistoricalValue>(
+      "SELECT value_json FROM account_value_history ORDER BY as_of_date,account_id,method",
+      "value_json",
+    );
+  }
+  async saveAccountValueHistory(values: HistoricalValue[]) {
+    validateHistory(values, await this.accounts());
+    if (!values.length) return;
+    const payload = JSON.stringify(values);
+    if (new TextEncoder().encode(payload).length > 1500000)
+      throw new Error("History batch exceeds byte limit");
+    await this.db
+      .prepare(
+        `INSERT INTO account_value_history(account_id,as_of_date,method,value_json)
+      SELECT json_extract(value,'$.accountId'),json_extract(value,'$.date'),json_extract(value,'$.method'),value
+      FROM json_each(?) WHERE 1
+      ON CONFLICT(account_id,as_of_date,method) DO UPDATE SET value_json=excluded.value_json
+      WHERE json_extract(excluded.value_json,'$.calculatedAt') > json_extract(account_value_history.value_json,'$.calculatedAt')`,
+      )
+      .bind(payload)
+      .run();
+  }
   balanceSnapshots() {
     return this.jsonRows<BalanceSnapshot>(
       "SELECT snapshot_json FROM balance_snapshots ORDER BY captured_at",

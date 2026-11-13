@@ -8,6 +8,7 @@ import type {
 } from "../accounting/types";
 import { eventId } from "../accounting/types";
 import { classify } from "../accounting/classify";
+import { validateHistory, type HistoricalValue } from "../accounting/history";
 import {
   defaultCoverage,
   reclassify,
@@ -23,6 +24,24 @@ import {
 
 /** Local synthetic preview and test adapter. Never selected on a public hostname. */
 export class MemoryLedger implements LedgerRepository {
+  historicalValues: HistoricalValue[] = [];
+  async accountValueHistory() {
+    return structuredClone(this.historicalValues);
+  }
+  async saveAccountValueHistory(values: HistoricalValue[]) {
+    validateHistory(values, this.selected);
+    for (const v of values) {
+      const index = this.historicalValues.findIndex(
+        (p) =>
+          p.accountId === v.accountId &&
+          p.date === v.date &&
+          p.method === v.method,
+      );
+      if (index < 0) this.historicalValues.push(structuredClone(v));
+      else if (v.calculatedAt > this.historicalValues[index].calculatedAt)
+        this.historicalValues[index] = structuredClone(v);
+    }
+  }
   snapshots: BalanceSnapshot[] = [];
   balanceStatus = emptyBalanceHealth();
   async balanceSnapshots() {

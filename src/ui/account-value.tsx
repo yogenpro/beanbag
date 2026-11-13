@@ -24,9 +24,27 @@ export function AccountValue({
   const { latest, history } = data;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const labelId = useId();
-  const net = !latest || latest.marginLoanCents !== null;
+  const net =
+    !latest || latest.netWorthCents !== null || latest.marginLoanCents !== null;
   const value = (point: BalancePoint) =>
     net ? point.netWorthCents : point.assetsCents;
+  const accountValue = (point: BalancePoint, id: string) => {
+    const b = point.accounts.find((a) => a.accountId === id);
+    if (!b) return null;
+    if (!net) return b.currentCents;
+    if (b.netValueCents !== undefined) return b.netValueCents;
+    return b.currentCents !== null && b.marginLoanCents !== null
+      ? b.currentCents - b.marginLoanCents
+      : null;
+  };
+  const source = (point: BalancePoint) =>
+    point.historyMethods
+      ? point.historyMethods
+          .map((m) =>
+            m === "institution_export" ? "Institution export" : "Plaid Assets",
+          )
+          .join(" + ")
+      : "Balance snapshot";
   const index = Math.min(
     selectedIndex ?? history.length - 1,
     history.length - 1,
@@ -87,7 +105,9 @@ export function AccountValue({
           <div>
             <strong className="balance-total">{amount(value(latest))}</strong>
             <p className="balance-collected">
-              Latest snapshot · {timestamp(latest.capturedAt)}
+              {latest.asOfDate
+                ? `As of ${displayDate(latest.date)}`
+                : `Latest snapshot · ${timestamp(latest.capturedAt)}`}
             </p>
             <p className="help">
               Latest recorded value, regardless of the reporting period.
@@ -110,13 +130,19 @@ export function AccountValue({
                     />
                     {account.role === "joint_checking"
                       ? "Checking"
-                      : "Brokerage · cash & holdings"}
+                      : balance?.netValueCents !== undefined
+                        ? "Brokerage · net value"
+                        : "Brokerage · cash & holdings"}
                   </dt>
-                  <dd>{amount(balance?.currentCents ?? null)}</dd>
+                  <dd>
+                    {amount(
+                      balance?.netValueCents ?? balance?.currentCents ?? null,
+                    )}
+                  </dd>
                 </div>
               );
             })}
-            {latest.marginLoanCents !== 0 && (
+            {!latest.historyMethods && latest.marginLoanCents !== 0 && (
               <div>
                 <dt>Brokerage borrowing</dt>
                 <dd>
@@ -194,7 +220,7 @@ export function AccountValue({
                   viewBox="0 0 100 100"
                   preserveAspectRatio="none"
                   role="img"
-                  aria-label={`${net ? "Tracked net worth" : "Account value"} history: ${available.length} recorded daily snapshots. Use ${interactive ? "the snapshot selector or " : ""}the table for exact values.`}
+                  aria-label={`${net ? "Tracked net worth" : "Account value"} history: ${available.length} daily values. Use ${interactive ? "the date selector or " : ""}the table for exact values.`}
                   onClick={(event) => {
                     if (!interactive) return;
                     const box = event.currentTarget.getBoundingClientRect();
@@ -233,7 +259,7 @@ export function AccountValue({
                     // A round, non-scaling stroke stays circular in this responsive SVG.
                     return (
                       <line
-                        key={point.capturedAt}
+                        key={point.date}
                         x1={x(point)}
                         x2={x(point)}
                         y1={y(point)}
@@ -268,20 +294,22 @@ export function AccountValue({
               </div>
               <div className="balance-selection" aria-live="polite">
                 <span>
-                  {selected ? displayDate(selected.date) : "Choose a snapshot"}
+                  {selected
+                    ? `${displayDate(selected.date)}${selected.historyMethods ? " · Imported" : ""}`
+                    : "Choose a date"}
                 </span>
                 <strong>{selected ? amount(value(selected)) : ""}</strong>
               </div>
               {history.length > 1 && interactive ? (
                 <label className="balance-slider-label">
-                  Inspect a snapshot
+                  Inspect a date
                   <input
                     type="range"
                     min="0"
                     max={history.length - 1}
                     step="1"
                     value={index}
-                    aria-label="Snapshot date"
+                    aria-label="History date"
                     aria-valuetext={
                       selected
                         ? `${displayDate(selected.date)}, ${amount(value(selected))}`
@@ -292,7 +320,7 @@ export function AccountValue({
                 </label>
               ) : history.length === 1 ? (
                 <p className="help">
-                  First snapshot saved. Another day’s snapshot will start the
+                  First daily value saved. Another day’s value will start the
                   trend.
                 </p>
               ) : null}
@@ -300,17 +328,26 @@ export function AccountValue({
           )}
           <p className="balance-method">
             {net ? "Net worth" : "Account value"} for these two accounts only.
-            {net ? " Reported brokerage borrowing is deducted." : ""} Changes
-            include market movements and money entering or leaving; they are not
+            {net ? " Brokerage values include borrowing." : ""} Changes include
+            market movements and money entering or leaving; they are not
             investment returns. Gaps have no recorded balance.
           </p>
           <details className="balance-details">
-            <summary>Snapshots & freshness</summary>
+            <summary>History & freshness</summary>
             <p className="help">
               Collected from {latest.provider}. Collection time is when Beanbag
-              received the data; institution balances may be older.
-              Stock-receipt income keeps its original historical value.
+              received the data ({timestamp(latest.capturedAt)}); institution
+              balances may be older. Stock-receipt income keeps its original
+              historical value.
             </p>
+            {history.some((p) => p.historyMethods) && (
+              <p className="help">
+                Imported dates follow the institution’s calendar. Exported net
+                account values already include cash and debit balances. Plaid
+                Assets supplies calculated checking history where an export is
+                unavailable.
+              </p>
+            )}
             <dl className="balance-source-times">
               {accounts.map((account) => {
                 const balance = latest.accounts.find(
@@ -337,23 +374,41 @@ export function AccountValue({
               <div className="balance-table-wrap">
                 <table>
                   <caption>
-                    Saved daily snapshots in the reporting period
+                    Daily account values in the reporting period
                   </caption>
                   <thead>
                     <tr>
-                      <th scope="col">Date (PT)</th>
-                      <th scope="col">Account value</th>
-                      <th scope="col">Borrowing</th>
-                      <th scope="col">Net worth</th>
+                      <th scope="col">Date</th>
+                      <th scope="col">Checking</th>
+                      <th scope="col">{net ? "Brokerage net" : "Brokerage"}</th>
+                      <th scope="col">{net ? "Net worth" : "Account value"}</th>
+                      <th scope="col">Source</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...history].reverse().map((point) => (
-                      <tr key={point.capturedAt}>
+                      <tr key={point.date}>
                         <th scope="row">{displayDate(point.date)}</th>
-                        <td>{amount(point.assetsCents)}</td>
-                        <td>{amount(point.marginLoanCents)}</td>
-                        <td>{amount(point.netWorthCents)}</td>
+                        <td>
+                          {amount(
+                            accountValue(
+                              point,
+                              accounts.find((a) => a.role === "joint_checking")
+                                ?.id ?? "",
+                            ),
+                          )}
+                        </td>
+                        <td>
+                          {amount(
+                            accountValue(
+                              point,
+                              accounts.find((a) => a.role === "joint_brokerage")
+                                ?.id ?? "",
+                            ),
+                          )}
+                        </td>
+                        <td>{amount(value(point))}</td>
+                        <td>{source(point)}</td>
                       </tr>
                     ))}
                   </tbody>

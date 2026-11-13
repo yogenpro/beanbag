@@ -103,6 +103,13 @@ Show a borrowing deduction when nonzero; no owner-confirmation labels or workflo
 Unknown borrowing shows account value before borrowing instead of an invented zero.
 Keep the accepted visual system and the strictly read-only interaction model.
 
+History backfill: support institution-dated daily exports and calculated checking
+history without pretending historical dates were collection times. Preserve the
+same chart, range control, spacing and palette. Use History & freshness and a
+daily table with checking, brokerage net, combined value and source. An imported
+already-net brokerage value needs no additional loan deduction or confirmation.
+Display a later imported pair as of its provider date; keep missing dates as gaps.
+
 Use only the loopback illustrative repository. Build before browser checks,
 exercise all three views and read-only record details, inspect desktop/mobile
 screenshots, and run the Impeccable detector once. Finish with a visual review of

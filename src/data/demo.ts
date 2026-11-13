@@ -196,6 +196,18 @@ export function demoLedger(now = new Date()): MemoryLedger {
   };
   const latest = repo.snapshots.at(-1)!;
   latest.accounts[1].marginLoanCents = 87000;
+  // An invented export exercises imported dates without changing the current snapshot.
+  const imported = repo.snapshots[0];
+  repo.historicalValues = imported.accounts.map((b, i) => ({
+    accountId: b.accountId,
+    date: pacificToday(new Date(imported.capturedAt)),
+    calculatedAt: now.toISOString(),
+    method: "institution_export",
+    netValueCents: b.currentCents! - b.marginLoanCents!,
+    assetsCents: i === 0 ? b.currentCents : null,
+    borrowingCents: i === 0 ? 0 : null,
+    source: "Illustrative daily institution export",
+  }));
   const priceDate = receipt.date;
   const valuation: Valuation = {
     securityId: receipt.securityId!,
