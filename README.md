@@ -8,7 +8,7 @@ The public repository contains portable code and invented test/demo records.
 Deployment identities, household account selection, credentials, financial data,
 and infrastructure policies stay private. There is no ChatGPT runtime dependency.
 
-The dashboard is **strictly read-only**: Overview, Activity, and Data health.
+The dashboard is **strictly read-only**: Overview, Activity, Projections, and Data health.
 Charts, filters and record details let you inspect saved information. Unclassified
 entries remain excluded from income/spending with an explanatory note; there is
 no review queue, editing form, receipt entry, connection control or sync action.
@@ -142,6 +142,37 @@ Net cash already includes cash debits, so borrowing is never deducted twice.
 Private operator tooling retains raw price responses, replayed positions,
 statement comparisons and evidence hashes; there is no browser import control
 or new background price job.
+
+## Future projections
+
+Projections starts from the latest saved combined net value and runs entirely in
+the browser using saved records from the existing read-only report API. Choose a
+12-month, 3-year or 5-year history window and a 1–30-year horizon. Adjust monthly
+net cash flow, monthly net share transfers, annual geometric growth, return
+volatility and contribution variability. Changes update the graph immediately.
+Inputs stay in browser memory across dashboard tabs and reset on page reload;
+there are no server writes, cookies or local-storage records for scenarios.
+
+History estimates use at least three usable whole calendar months before the
+latest balance's month. Contribution estimates require both products' loaded
+transaction windows and no unresolved external flows. Known zero-flow months
+count; missing months do not. Cash and shares remain separate, using the existing
+accounting boundary and saved share-transfer values. Growth and volatility use
+monthly daily-linked time-weighted returns and additionally require every daily
+net balance, including the previous month-end. Missing estimates require manual
+assumptions rather than an invented zero or current market quote.
+
+The line is the median of 1,000 repeatable simulated paths; the shaded band covers
+the central 50%, 80% or 95% of modeled outcomes at each month. Monthly log returns
+and net contributions are independent normal draws with constant parameters;
+contributions arrive at month-end. Growth applies to positive balances. Negative
+values indicate an unfunded shortfall, without an assumed borrowing rate.
+Values are nominal, without inflation adjustment. This conditional outcome range
+does not establish a statistical confidence guarantee, estimate parameter
+uncertainty, or imply that past growth will persist. Model details, usable month
+lists, keyboard month inspection and an annual table are available in the tab.
+
+## Historical value change and returns
 
 The balance view also explains the selected period's change as **income minus
 expenses plus estimated investment gain/loss**. It compares net values using the

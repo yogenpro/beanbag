@@ -49,6 +49,11 @@ invented records; the separate private integration ledger is not its data source
   financial records, private identities, credentials, or deployment details.
 - Preserve keyboard navigation, accessible labels, responsive layouts, read-only
   record details and period selection.
+- On November 13, 2026, the owner requested a future-projections tab using the
+  latest account value, historical flows and growth, an uncertainty band and
+  adjustable assumptions. It remains read-only; projection inputs must not be
+  stored on the server. Any needed persistence must use browser storage. The
+  implementation uses browser memory only, with no persistence across reloads.
 
 ## Brand Commitments
 

@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Rows3,
   ShieldCheck,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { PeriodPicker } from "./period-picker";
@@ -23,6 +24,7 @@ import { transactionCoverage } from "../accounting/coverage";
 import type { EventKind, FinancialEvent } from "../accounting/types";
 import { api, money, displayDate, type Dashboard, type Detail } from "./api";
 import { AccountValue } from "./account-value";
+import { Projections, initialProjectionSettings } from "./projections";
 import { movementDirection } from "../accounting/movements";
 import "./style.css";
 
@@ -52,7 +54,7 @@ type Filter =
   | "net_recorded"
   | "pending"
   | "unclassified";
-type Tab = "overview" | "activity" | "health";
+type Tab = "overview" | "activity" | "projections" | "health";
 function Button({
   children,
   onClick,
@@ -644,6 +646,9 @@ function Health({
   );
 }
 function App() {
+  const [projectionSettings, setProjectionSettings] = useState(
+    initialProjectionSettings,
+  );
   const [selection, setSelection] = useState<RangeSelection>({
     tab: "month",
     value: "rolling",
@@ -726,6 +731,7 @@ function App() {
             [
               ["overview", "Overview", LayoutDashboard],
               ["activity", "Activity", Rows3],
+              ["projections", "Projections", TrendingUp],
               ["health", "Data health", Activity],
             ] as const
           ).map(([value, label, Icon]) => (
@@ -784,14 +790,18 @@ function App() {
                 ? "Overview"
                 : tab === "activity"
                   ? "Account activity"
-                  : "Data health"}
+                  : tab === "projections"
+                    ? "Future projections"
+                    : "Data health"}
             </h1>
             <p className="subtitle">
               {tab === "overview"
                 ? "Account value, income, and spending across your two accounts."
                 : tab === "health"
                   ? "Independent sync status, reporting gaps, and connection details."
-                  : "Browse posted records and the evidence behind each total."}
+                  : tab === "projections"
+                    ? "Explore future account values using your history and adjustable assumptions."
+                    : "Browse posted records and the evidence behind each total."}
             </p>
           </div>
           <span className="read-only-label">
@@ -799,12 +809,14 @@ function App() {
             Read-only
           </span>
         </div>
-        <PeriodPicker
-          selection={selection}
-          options={options}
-          selected={selected}
-          onChange={setSelection}
-        />
+        {tab !== "projections" && (
+          <PeriodPicker
+            selection={selection}
+            options={options}
+            selected={selected}
+            onChange={setSelection}
+          />
+        )}
         {notice && (
           <div className="notice" role="status">
             {notice}
@@ -838,6 +850,13 @@ function App() {
           data &&
           totals && (
             <>
+              {tab === "projections" && (
+                <Projections
+                  data={data}
+                  settings={projectionSettings}
+                  onChange={setProjectionSettings}
+                />
+              )}
               {tab === "overview" && (
                 <>
                   <AccountValue

@@ -1,5 +1,18 @@
 # Beanbag next steps
 
+## Browser-only projections — November 13, 2026
+
+The dashboard now includes Projections alongside Overview, Activity and Data
+health. Its forecast starts at the latest saved net balance. History estimates
+separate cash and shares, preserve the external-flow convention, and reuse daily
+time-weighted returns for growth. Complete-month coverage, unresolved-flow and
+daily-balance checks withhold unsupported defaults. Users can enter assumptions
+without changing the ledger. The median graph, selectable outcome band, month
+inspection and annual table all run locally; inputs remain in browser memory and
+reset on reload. No backend endpoint, schema or infrastructure change is needed.
+See README's future-projections section for the model and its limitations.
+This local implementation does not establish deployment or live-data coverage.
+
 Resumed on November 11, 2026 Pacific. The first implementation milestone and
 initial Sandbox integration are committed to the public
 [beanbag repository](https://github.com/yogenpro/beanbag). A separate private local
