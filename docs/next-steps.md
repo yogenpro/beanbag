@@ -168,6 +168,16 @@ Private infra owns schema approval and bounded import after verified recovery.
 No polling or public write route is added. Historical quote normalization must
 reverse later splits and must never substitute dividend-adjusted prices.
 
+The next extension adds a **change breakdown** to the same read-only balance
+view: total change, income less external expenses, and estimated investment
+gain/loss. Balance and flow dates align using a prior-day opening value when
+available; shorter comparisons name their actual dates. Missing history or
+unresolved flows withhold the split. This is a dollar residual including
+dividends, interest, fees and valuation/timing differences, not a rate of return
+or a tax figure. No new pricing, ingestion, schema or stored financial changes
+are needed. The API and private offline report share the calculation; ordinary
+checked-main deployment uses the existing private Cloudflare adapter.
+
 The updated backend suite has 127 passing tests. The balance-view browser checks
 cover keyboard snapshot selection, the daily table, period changes that preserve
 the latest value, and the existing review flows. Visual inspection includes

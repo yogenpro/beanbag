@@ -1,7 +1,8 @@
 import { pacificToday, type Period } from "./dates";
 import { sumCents } from "./money";
-import type { Account } from "./types";
+import type { Account, Coverage, FinancialEvent } from "./types";
 import type { HistoricalValue } from "./history";
+import { accountValueChange } from "./value-change";
 
 // Balance observations are independent of receipt valuations and financial events.
 export type AccountBalance = {
@@ -95,6 +96,7 @@ export function balanceReport(
   period: Period,
   now = new Date(),
   historical: HistoricalValue[] = [],
+  flows?: { events: FinancialEvent[]; coverage: Coverage[] },
 ) {
   // A changed account selection must never splice two different boundaries together.
   const ids = accounts
@@ -160,12 +162,24 @@ export function balanceReport(
       a.date.localeCompare(b.date) || a.capturedAt.localeCompare(b.capturedAt),
   );
   const latest = combined.at(-1) ?? null;
-  for (const point of combined)
-    if (point.date >= period.start && point.date <= period.end)
-      daily.set(point.date, point);
+  for (const point of combined) daily.set(point.date, point);
+  const allDays = [...daily.values()].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
   return {
     latest,
-    history: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    history: allDays.filter(
+      (p) => p.date >= period.start && p.date <= period.end,
+    ),
+    change: flows
+      ? accountValueChange(
+          allDays,
+          flows.events,
+          accounts,
+          flows.coverage,
+          period,
+        )
+      : null,
     health,
     stale:
       !!latest &&

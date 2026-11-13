@@ -26,6 +26,18 @@ The suite now passes 204 tests and ten desktop/mobile browser checks, including
 derived-history persistence, reported priority, borrowing, fractional quantities,
 split handling, prior-close selection and invalid evidence rejection.
 
+Selected-period balance changes now have an aligned breakdown of total change,
+income less external expenses, and estimated investment gain/loss. The opening
+value uses the day before the period when available; a missing opening or ending
+date yields an explicit shorter comparison, never a fabricated balance. The
+residual includes dividends, interest, fees and valuation/timing differences.
+Unknown transaction windows or unresolved flows withhold the split. Current
+reported values, historical balances and receipt valuations are unchanged. The
+suite passes 216 checks and twelve desktop/mobile browser checks, including
+first-day flows, in-kind outflows, negative equity, borrowing, partial periods,
+losses during account growth, missing history, period changes and read-only API
+behavior. The local private offline report reuses the same calculation.
+
 - [x] M0: Worker + React + Hono scaffold, D1 migration and synthetic local spike.
 - [ ] M0 external: independent Plaid consent, product/plan access and one genuine
       incoming securities transfer verified against institution evidence.
