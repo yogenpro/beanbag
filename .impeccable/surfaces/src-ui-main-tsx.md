@@ -119,6 +119,13 @@ three columns over two rows on narrow screens, readable labels and keyboard tabs
 All totals and charts follow the range; latest account value stays independent.
 This is an extension of the accepted system, with no design-token rewrite.
 
+Transaction-history correction: long ranges must not present the original
+90-day transaction slice as a full-period income/expense result. Show loaded
+transaction dates beside the recorded totals, label partial periods clearly,
+and replace totals/charts with an unavailable-history state when neither account
+has data for the range. Keep balance history independent and preserve the
+accepted controls, typography and palette. No ingestion control enters the UI.
+
 Use only the loopback illustrative repository. Build before browser checks,
 exercise all three views and read-only record details, inspect desktop/mobile
 screenshots, and run the Impeccable detector once. Finish with a visual review of

@@ -114,10 +114,11 @@ All dashboard API mutations are rejected for every identity (including admins).
 belong to private operator tooling or separately authenticated provider ingestion.
 Hosted consent/repair provisioning needs a private operator path before deployment;
 do not restore browser write routes to complete it. The current automated suite
-has 190 passing tests, including rejection of writes without database/provider
-effects and calendar range boundaries. Eight desktop/mobile checks cover read-only
+has 197 passing tests, including rejection of writes without database/provider
+effects and calendar range boundaries. Ten desktop/mobile checks cover read-only
 browsing, rolling/calendar period selections, institution-dated net values and no
-write requests.
+write requests. The multi-year regression checks actual rendered totals for all
+six ranges, partial periods and unavailable history, rather than request dates alone.
 
 The owner also requested current tracked-account value/net worth and a history
 chart. The working tree now includes immutable balance observations, exact-cent

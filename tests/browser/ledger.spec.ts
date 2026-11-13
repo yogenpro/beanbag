@@ -1,4 +1,113 @@
 import { expect, test } from "@playwright/test";
+import { report } from "../../src/accounting/report";
+
+test("historical ranges change rendered totals and distinguish missing history from zero", async ({
+  page,
+}) => {
+  const fixture = await (await page.request.get("/api/report")).json();
+  expect(fixture.illustrative).toBe(true);
+  await page.clock.install({ time: new Date("2026-11-12T20:00:00Z") });
+  const cash = fixture.records.find(
+    (event: { kind: string }) => event.kind === "cash_income",
+  );
+  const spending = fixture.records.find(
+    (event: { kind: string }) => event.kind === "spending",
+  );
+  const events = (
+    [
+      ["2026-10-15", 10000],
+      ["2026-08-14", 20000],
+      ["2026-05-15", 25000],
+      ["2026-02-15", 30000],
+      ["2025-06-15", 40000],
+      ["2024-11-20", 50000],
+    ] as [string, number][]
+  ).flatMap(([date, amount], index) => [
+    {
+      ...cash,
+      id: `invented-income-${index}`,
+      date,
+      amountCents: amount,
+      status: "confirmed",
+    },
+    {
+      ...spending,
+      id: `invented-expense-${index}`,
+      date,
+      amountCents: amount / 2,
+      status: "confirmed",
+    },
+  ]);
+  fixture.coverage = fixture.coverage.map((value: object) => ({
+    ...value,
+    history: {
+      start: "2024-11-13",
+      end: "2026-11-13",
+      source: "Invented provider history",
+      retrievedAt: "2026-11-13T20:00:00Z",
+    },
+  }));
+  fixture.availablePeriod = { start: "2023-01-01", end: "2026-11-13" };
+  await page.route("**/api/report*", (route) => {
+    const url = new URL(route.request().url()),
+      period = {
+        start: url.searchParams.get("start")!,
+        end: url.searchParams.get("end")!,
+      };
+    const result = report(events, period),
+      data = { ...structuredClone(fixture), ...result, trend: result.months };
+    data.balances.history = data.balances.history.filter(
+      (point: { date: string }) =>
+        point.date >= period.start && point.date <= period.end,
+    );
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(data),
+    });
+  });
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (!["GET", "HEAD"].includes(request.method()))
+      writes.push(request.method());
+  });
+  await page.goto("/");
+  const income = page
+    .getByRole("button", { name: "View total recorded income records" })
+    .locator("strong");
+  await expect(income).toHaveText("$100.00");
+  for (const [name, amount] of [
+    ["Last 3 months", "$300.00"],
+    ["Last 6 months", "$550.00"],
+    ["Year to date", "$850.00"],
+    ["Last year", "$400.00"],
+    ["Max", "$1,750.00"],
+  ]) {
+    await page.getByRole("tab", { name, exact: true }).click();
+    await expect(income).toHaveText(amount);
+  }
+  await expect(page.getByText("Partial period", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Last year", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Year", exact: true })
+    .selectOption("2023");
+  await expect(
+    page.getByRole("heading", {
+      name: "No transaction history for this period",
+    }),
+  ).toBeVisible();
+  await expect(income).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Income & expenses", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".balance-total")).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Year", exact: true })
+    .selectOption("2024");
+  await expect(income).toHaveText("$500.00");
+  await expect(page.getByText("Partial period", { exact: true })).toBeVisible();
+  expect(writes).toEqual([]);
+});
 
 test("rolling ranges, calendar period dropdowns, Max and keyboard tabs", async ({
   page,

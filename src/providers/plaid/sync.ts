@@ -91,6 +91,14 @@ export class SyncService {
       }
       if (!completed) throw new ProviderError("PAGINATION_LIMIT");
       const coverage = await this.health("checking", started, writes, removed);
+      if (originalCursor && coverage.history) {
+        const end = pacificToday(this.now());
+        coverage.history = {
+          ...coverage.history,
+          end: end > coverage.history.end ? end : coverage.history.end,
+          retrievedAt: this.now().toISOString(),
+        };
+      }
       await this.repo.commitSync({
         product: "checking",
         leaseId: lease,
@@ -188,7 +196,21 @@ export class SyncService {
         removed,
         reconciliation,
       );
-      coverage.startDate = start;
+      coverage.startDate =
+        coverage.startDate && coverage.startDate < start
+          ? coverage.startDate
+          : start;
+      if (
+        coverage.history &&
+        start <= coverage.history.end &&
+        end >= coverage.history.start
+      )
+        coverage.history = {
+          ...coverage.history,
+          start:
+            coverage.history.start < start ? coverage.history.start : start,
+          end: coverage.history.end > end ? coverage.history.end : end,
+        };
       await this.repo.commitSync({
         product: "investments",
         leaseId: lease,

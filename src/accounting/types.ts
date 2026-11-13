@@ -89,6 +89,12 @@ export type FinancialEvent = {
   transferGroup?: string;
 };
 export type Coverage = {
+  history?: {
+    start: string;
+    end: string;
+    source: string;
+    retrievedAt: string;
+  };
   product: "checking" | "investments";
   lastSuccess: string | null;
   lastAttempt: string | null;
