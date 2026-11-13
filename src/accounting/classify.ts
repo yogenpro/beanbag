@@ -1,5 +1,13 @@
 import { daysApart, validDate } from "./dates";
-import { positiveDecimal, valueShares } from "./money";
+import { decimalIdentity, positiveDecimal, valueShares } from "./money";
+import {
+  absoluteQuantity,
+  cashMovement,
+  investmentTransfer,
+  movementDirection,
+  oppositeMovement,
+  transferCandidate,
+} from "./movements";
 import {
   eventId,
   type Account,
@@ -10,7 +18,7 @@ import {
   type Valuation,
 } from "./types";
 
-export const RULE_VERSION = "boundary-1";
+export const RULE_VERSION = "boundary-2";
 
 export function validateValuation(
   source: InvestmentSource,
@@ -18,15 +26,23 @@ export function validateValuation(
 ): number {
   if (
     valuation.securityId !== source.securityId ||
-    valuation.quantity !== source.quantity ||
+    decimalIdentity(valuation.quantity) !==
+      decimalIdentity(absoluteQuantity(source.quantity) ?? "") ||
     valuation.eventDate !== source.date ||
     valuation.currency !== "USD" ||
-    valuation.convention !== "last_session_close" ||
+    !["last_session_close", "provider_transfer_price"].includes(
+      valuation.convention,
+    ) ||
     !valuation.provider.trim() ||
     !validDate(valuation.priceDate) ||
     valuation.priceDate > source.date ||
     daysApart(valuation.priceDate, source.date) > 7 ||
-    !Number.isFinite(Date.parse(valuation.retrievedAt))
+    (valuation.convention === "last_session_close" &&
+      !Number.isFinite(Date.parse(valuation.retrievedAt ?? ""))) ||
+    (valuation.convention === "provider_transfer_price" &&
+      (valuation.priceDate !== source.date ||
+        decimalIdentity(valuation.close) !==
+          decimalIdentity(source.unitPrice ?? "")))
   ) {
     throw new Error("Historical valuation does not match arrival evidence");
   }
@@ -38,7 +54,7 @@ export function classify(
   accounts: Account[],
   override?: Override,
   valuation?: Valuation,
-  matched = false,
+  matched: boolean | string = false,
 ): FinancialEvent {
   const base: FinancialEvent = {
     id: eventId(source),
@@ -49,7 +65,11 @@ export function classify(
     description: source.description,
     kind: "unknown",
     status: "needs_review",
-    amountCents: source.kind === "bank" ? Math.abs(source.amountCents) : null,
+    amountCents: cashMovement(source)
+      ? Math.abs(
+          source.kind === "bank" ? source.amountCents : source.cashAmountCents,
+        )
+      : null,
     category: "Unclassified",
     reason: "Evidence required",
     revision: source.revision,
@@ -103,10 +123,14 @@ export function classify(
         overrideId: override.id,
         reason: override.rationale,
       });
-    if (override.kind === "stock_income") {
+    if (
+      override.kind === "stock_income" ||
+      override.kind === "stock_spending"
+    ) {
       if (
         source.kind !== "investment" ||
         source.activity !== "transfer" ||
+        cashMovement(source) ||
         !override.valuation
       )
         return decision({
@@ -120,11 +144,14 @@ export function classify(
         );
         return decision({
           date,
-          kind: "stock_income",
+          kind: override.kind,
           status: "confirmed",
           amountCents: amount,
           valuation: override.valuation,
-          category: "Stock transfers",
+          category:
+            override.kind === "stock_income"
+              ? "Incoming stock transfers"
+              : "Outgoing stock transfers",
           reason: override.rationale,
           overrideId: override.id,
         });
@@ -138,10 +165,11 @@ export function classify(
     }
     if (
       (override.kind === "cash_income" || override.kind === "spending") &&
-      (source.kind !== "bank" || account.role !== "joint_checking")
+      (!cashMovement(source) ||
+        (source.kind === "investment" && !investmentTransfer(source)))
     )
       return decision({
-        reason: "Cash metrics require a checking transaction",
+        reason: "Cash metrics require an external cash movement",
       });
     return decision({
       date,
@@ -156,69 +184,73 @@ export function classify(
   const counterpart = accounts.find(
     (a) => a.id === source.counterpartAccountId && a.id !== account.id,
   );
-  if (source.kind === "bank") {
-    if (account.role !== "joint_checking")
-      return ignore(
-        "Only the selected checking account contributes cash metrics",
-      );
-    if (counterpart || matched)
-      return decision({
-        kind: "internal_transfer",
-        status: "confirmed",
-        category: "Internal transfer",
-        reason: counterpart
-          ? "Explicit counterparty is the selected brokerage account"
-          : "Unique matching transfer with shared source evidence",
-      });
-    const brokerage = accounts.find((a) => a.role === "joint_brokerage");
-    const statedMask = source.description.match(
-      /(?:brokerage).*?[-…*](\d{4})\b/i,
-    )?.[1];
-    const highConfidence =
-      /^(?:transfer (?:to|from) brokerage|overdraft transfer from brokerage)(?:\s|$)/i.test(
-        source.description.trim(),
-      );
-    if (highConfidence && (!statedMask || statedMask === brokerage?.mask))
-      return decision({
-        kind: "internal_transfer",
-        status: "confirmed",
-        category: "Internal transfer",
-        reason:
-          "Recognized checking ↔ selected brokerage transfer, including one-sided funding",
-      });
-    if (
-      /brokerage|overdraft|securit(?:y|ies)|investment transfer/i.test(
-        source.description,
-      )
-    )
-      return decision({
-        reason:
-          "Possible internal movement; selected counterparty is unverified",
-      });
-    if (source.amountCents === 0) return ignore("Zero-value cash event");
-    if (source.amountCents > 0)
-      return decision({
-        kind: "cash_income",
-        status: "confirmed",
-        category: /payroll|salary|direct deposit/i.test(source.description)
-          ? "Payroll"
-          : "Other deposits",
-        reason:
-          "Posted external checking receipt under the cash-boundary convention",
-      });
-    return decision({
-      kind: "spending",
+  const internal = (reason: string) =>
+    decision({
+      kind: "internal_transfer",
       status: "confirmed",
-      category: /card|amex|visa|mastercard|discover/i.test(source.description)
-        ? "Credit-card payments"
-        : (source.category ?? "Other payments"),
-      reason:
-        "Posted checking payment outside the two-account boundary; card purchases are not imported",
+      category: "Internal transfer",
+      amountCents: base.amountCents ?? 0,
+      transferGroup: typeof matched === "string" ? matched : base.id,
+      reason,
     });
+  if (
+    source.kind === "bank" ||
+    investmentTransfer(source) ||
+    (source.kind === "investment" && source.activity === "cash" && matched)
+  ) {
+    if (
+      counterpart ||
+      matched ||
+      (source.kind === "investment" && source.origin === "internal")
+    )
+      return internal(
+        counterpart
+          ? "Counterparty is the other tracked account"
+          : "Matched movement between the two tracked accounts",
+      );
+    const other = accounts.find((a) => a.id !== account.id);
+    const statedMask = source.description.match(
+      /(?:checking|brokerage).*?(?:[-…*]|ending(?:\s+in)?\s+)(\d{4})\b/i,
+    )?.[1];
+    const knownRole =
+      account.role === "joint_checking" ? "brokerage" : "checking";
+    if (
+      other &&
+      statedMask === other.mask &&
+      new RegExp(knownRole, "i").test(source.description)
+    )
+      return internal("Transfer identifies the other tracked account");
+    if (cashMovement(source)) {
+      const amount =
+        source.kind === "bank" ? source.amountCents : source.cashAmountCents;
+      if (!Number.isSafeInteger(amount))
+        return decision({
+          amountCents: null,
+          reason: "Invalid money precision",
+        });
+      if (amount === 0) return ignore("Zero-value cash event");
+      const incoming = amount > 0;
+      return decision({
+        kind: incoming ? "cash_income" : "spending",
+        status: "confirmed",
+        category: incoming
+          ? /payroll|salary|direct deposit/i.test(source.description)
+            ? "Payroll"
+            : "External cash receipts"
+          : /card|amex|visa|mastercard|discover/i.test(source.description)
+            ? "Credit-card payments"
+            : source.kind === "bank"
+              ? (source.category ?? "External cash payments")
+              : "External cash transfers",
+        reason: incoming
+          ? "Cash entered a tracked account from outside the pair"
+          : "Cash left a tracked account for outside the pair",
+      });
+    }
   }
-  if (account.role !== "joint_brokerage")
-    return ignore("Investment is outside the selected brokerage role");
-  if (source.activity !== "transfer") {
+  if (source.kind !== "investment")
+    return decision({ reason: "Unrecognized cash movement" });
+  if (!investmentTransfer(source)) {
     if (
       [
         "buy",
@@ -241,81 +273,113 @@ export function classify(
         "Unrecognized investment activity; verify it is not a corporate action",
     });
   }
-  if (source.origin === "internal" || counterpart)
-    return ignore("Investment transfer is internal to the account boundary");
-  if (source.direction === "out")
-    return ignore("Outgoing securities are outside this income measure");
+  const direction = movementDirection(source);
+  const quantity = absoluteQuantity(source.quantity);
   if (
     !source.securityId ||
-    !source.quantity ||
-    !positiveDecimal(source.quantity) ||
-    source.direction !== "in" ||
-    source.origin !== "external" ||
-    !source.evidence
+    !quantity ||
+    !positiveDecimal(quantity) ||
+    direction === "unknown"
   )
     return decision({
       reason:
-        "Verify incoming direction, external origin, security identity and exact quantity",
+        "Share transfer is missing its direction, security identity or exact quantity",
     });
+  const kind = direction === "in" ? "stock_income" : "stock_spending";
+  if (!valuation && source.unitPrice && positiveDecimal(source.unitPrice))
+    valuation = {
+      securityId: source.securityId,
+      quantity,
+      eventDate: source.date,
+      close: source.unitPrice,
+      priceDate: source.date,
+      currency: "USD",
+      provider: "Institution transfer record via Plaid",
+      convention: "provider_transfer_price",
+    };
   if (!valuation)
     return decision({
+      kind,
+      category:
+        direction === "in"
+          ? "Incoming stock transfers"
+          : "Outgoing stock transfers",
       reason:
-        "Missing historical closing price; current quotes are never substituted",
+        "Transfer is classified; its recorded price is missing. Current quotes are not substituted.",
     });
   try {
     return decision({
-      kind: "stock_income",
+      kind,
       status: "confirmed",
       amountCents: validateValuation(source, valuation),
       valuation,
-      category: "Stock transfers",
+      category:
+        direction === "in"
+          ? "Incoming stock transfers"
+          : "Outgoing stock transfers",
       reason:
-        "Verified external securities receipt valued at arrival-date historical close",
+        valuation.convention === "provider_transfer_price"
+          ? "External share transfer valued at its recorded transfer price"
+          : "External share transfer valued at its saved historical close",
     });
   } catch {
     return decision({
-      reason: "Historical price or receipt metadata requires review",
+      reason: "Saved valuation does not match the current transfer record",
     });
   }
 }
 
-/** Amount/date alone is insufficient: require a unique candidate with a shared reference. */
+/** Match unique reciprocal transfer legs; both accounts must identify transfer activity. */
 export function transferMatches(
   sources: Source[],
   accounts: Account[],
-): Set<string> {
-  const checking = accounts.find((a) => a.role === "joint_checking")?.id;
-  const brokerage = accounts.find((a) => a.role === "joint_brokerage")?.id;
+): Map<string, string> {
+  const ids = new Set(accounts.map((a) => a.id));
+  const transfers = sources.filter(
+    (s) => ids.has(s.accountId) && transferCandidate(s),
+  );
+  const mask = (source: Source) =>
+    source.description.match(
+      /(?:checking|brokerage).*?(?:[-…*]|ending(?:\s+in)?\s+)(\d{4})\b/i,
+    )?.[1];
   const candidates = new Map<string, string[]>();
-  for (const bank of sources) {
+  for (const source of transfers) {
+    const matches = transfers.filter(
+      (other) =>
+        other.accountId !== source.accountId &&
+        source.currency === other.currency &&
+        validDate(source.date) &&
+        validDate(other.date) &&
+        daysApart(source.date, other.date) <= 3 &&
+        (!source.counterpartAccountId ||
+          source.counterpartAccountId === other.accountId) &&
+        (!other.counterpartAccountId ||
+          other.counterpartAccountId === source.accountId) &&
+        (!mask(source) ||
+          mask(source) ===
+            accounts.find((a) => a.id === other.accountId)?.mask) &&
+        (!mask(other) ||
+          mask(other) ===
+            accounts.find((a) => a.id === source.accountId)?.mask) &&
+        (!source.transferReference ||
+          !other.transferReference ||
+          source.transferReference === other.transferReference) &&
+        oppositeMovement(source, other),
+    );
+    candidates.set(eventId(source), matches.map(eventId));
+  }
+  const result = new Map<string, string>();
+  for (const [id, matches] of candidates) {
+    if (matches.length !== 1) continue;
+    const other = matches[0];
     if (
-      bank.kind !== "bank" ||
-      bank.accountId !== checking ||
-      bank.pending ||
-      bank.removed ||
-      !bank.transferReference
+      candidates.get(other)?.length !== 1 ||
+      candidates.get(other)?.[0] !== id
     )
       continue;
-    const matches = sources.filter(
-      (other): other is InvestmentSource =>
-        other.kind === "investment" &&
-        other.accountId === brokerage &&
-        !other.removed &&
-        other.activity === "cash" &&
-        other.currency === bank.currency &&
-        other.transferReference === bank.transferReference &&
-        other.cashAmountCents === -bank.amountCents &&
-        daysApart(bank.date, other.date) <= 3,
-    );
-    if (matches.length === 1)
-      candidates.set(eventId(bank), [eventId(matches[0])]);
-  }
-  const result = new Set<string>();
-  for (const [bank, [investment]] of candidates) {
-    if (
-      [...candidates.values()].filter(([id]) => id === investment).length === 1
-    )
-      result.add(bank);
+    const group = [id, other].sort().join("|");
+    result.set(id, group);
+    result.set(other, group);
   }
   return result;
 }

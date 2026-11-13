@@ -28,7 +28,9 @@ export type InvestmentSource = CommonSource & {
   subtype?: string;
   securityId?: string;
   ticker?: string;
+  securityType?: string;
   quantity?: string;
+  unitPrice?: string;
   cashAmountCents: number;
   direction: "in" | "out" | "unknown";
   origin: "external" | "internal" | "unknown";
@@ -40,6 +42,7 @@ export type Source = BankSource | InvestmentSource;
 export type EventKind =
   | "cash_income"
   | "stock_income"
+  | "stock_spending"
   | "spending"
   | "internal_transfer"
   | "ignored"
@@ -52,9 +55,9 @@ export type Valuation = {
   priceDate: string;
   currency: "USD";
   provider: string;
-  retrievedAt: string;
-  // Provider must attest this is the final trading-session close on/before eventDate.
-  convention: "last_session_close";
+  retrievedAt?: string;
+  // Recorded transfer prices are distinct from reviewed market-closing prices.
+  convention: "last_session_close" | "provider_transfer_price";
 };
 export type Override = {
   id: string;
@@ -83,6 +86,7 @@ export type FinancialEvent = {
   revision: string;
   valuation?: Valuation;
   overrideId?: string;
+  transferGroup?: string;
 };
 export type Coverage = {
   product: "checking" | "investments";

@@ -21,20 +21,31 @@ import { periodFor, type Period } from "../accounting/dates";
 import type { EventKind, FinancialEvent } from "../accounting/types";
 import { api, money, displayDate, type Dashboard, type Detail } from "./api";
 import { AccountValue } from "./account-value";
+import { movementDirection } from "../accounting/movements";
 import "./style.css";
 
 const kindNames: Record<EventKind, string> = {
-  cash_income: "Checking income",
+  cash_income: "Cash income",
   stock_income: "Incoming stock transfers",
-  spending: "Checking spending",
+  spending: "Cash payments",
+  stock_spending: "Outgoing stock transfers",
   internal_transfer: "Internal transfer",
   ignored: "Excluded activity",
   unknown: "Unclassified",
 };
+const statusName = (event: FinancialEvent) =>
+  event.status === "pending"
+    ? "Pending"
+    : event.status === "needs_review"
+      ? event.kind !== "unknown" && event.amountCents === null
+        ? "Unvalued"
+        : "Unclassified"
+      : kindNames[event.kind];
 type Filter =
   | EventKind
   | "all"
   | "income"
+  | "expenses"
   | "net_cash"
   | "net_recorded"
   | "pending"
@@ -155,10 +166,17 @@ function Records({
       if (e.status !== "confirmed") return false;
       if (filter === "income")
         return ["cash_income", "stock_income"].includes(e.kind);
+      if (filter === "expenses")
+        return ["spending", "stock_spending"].includes(e.kind);
       if (filter === "net_cash")
         return ["cash_income", "spending"].includes(e.kind);
       if (filter === "net_recorded")
-        return ["cash_income", "stock_income", "spending"].includes(e.kind);
+        return [
+          "cash_income",
+          "stock_income",
+          "spending",
+          "stock_spending",
+        ].includes(e.kind);
       return e.kind === filter;
     })
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
@@ -168,7 +186,7 @@ function Records({
         <div>
           <h2>
             {filter === "unclassified"
-              ? "Unclassified entries"
+              ? "Incomplete entries"
               : compact
                 ? "Recent activity"
                 : "Records"}{" "}
@@ -182,14 +200,16 @@ function Records({
             onChange={(e) => setFilter(e.target.value as Filter)}
           >
             <option value="all">All activity</option>
-            <option value="cash_income">Checking income</option>
+            <option value="cash_income">Cash income</option>
             <option value="stock_income">Stock transfers</option>
             <option value="income">Total recorded income</option>
-            <option value="spending">Checking spending</option>
+            <option value="expenses">Total expenses</option>
+            <option value="spending">Cash payments</option>
+            <option value="stock_spending">Outgoing stock transfers</option>
             <option value="net_cash">Net cash flow</option>
             <option value="net_recorded">Net recorded inflow</option>
             <option value="internal_transfer">Internal transfers</option>
-            <option value="unclassified">Unclassified entries</option>
+            <option value="unclassified">Incomplete entries</option>
             <option value="pending">Pending</option>
             <option value="ignored">Excluded investment activity</option>
           </select>
@@ -200,7 +220,7 @@ function Records({
           <CheckCheck size={28} />
           <h3>
             {filter === "unclassified"
-              ? "No unclassified entries in this period"
+              ? "No incomplete entries in this period"
               : "No matching records"}
           </h3>
           <p>Choose another date range or activity filter.</p>
@@ -242,13 +262,9 @@ function Records({
                   </td>
                   <td>
                     <span
-                      className={`status ${e.status === "needs_review" ? "review" : e.status === "pending" ? "pending" : e.kind === "internal_transfer" || e.kind === "ignored" ? "internal" : e.kind === "stock_income" ? "stock" : e.kind === "spending" ? "outflow" : ""}`}
+                      className={`status ${e.status === "needs_review" ? "review" : e.status === "pending" ? "pending" : e.kind === "internal_transfer" || e.kind === "ignored" ? "internal" : e.kind === "stock_income" ? "stock" : ["spending", "stock_spending"].includes(e.kind) ? "outflow" : ""}`}
                     >
-                      {e.status === "needs_review"
-                        ? "Unclassified"
-                        : e.status === "pending"
-                          ? "Pending"
-                          : kindNames[e.kind]}
+                      {statusName(e)}
                     </span>
                   </td>
                   <td
@@ -256,7 +272,7 @@ function Records({
                   >
                     {e.amountCents === null
                       ? "Unvalued"
-                      : `${e.kind === "spending" ? "−" : e.kind === "cash_income" || e.kind === "stock_income" ? "+" : ""}${money(e.amountCents)}`}
+                      : `${["spending", "stock_spending"].includes(e.kind) ? "−" : e.kind === "cash_income" || e.kind === "stock_income" ? "+" : ""}${money(e.amountCents)}`}
                     <small>
                       {e.status !== "confirmed"
                         ? "Not in totals"
@@ -307,7 +323,7 @@ function Trend({
     <section className="panel trend">
       <div className="panel-heading">
         <div>
-          <h2>Income & spending</h2>
+          <h2>Income & expenses</h2>
         </div>
         <span className="subtle">
           {data.period.end.slice(0, 4)} · through {displayDate(data.period.end)}
@@ -316,7 +332,7 @@ function Trend({
       <div className="legend">
         <span>
           <i className="cash-dot" />
-          Checking income
+          Cash income
         </span>
         <span>
           <i className="stock-dot" />
@@ -324,7 +340,7 @@ function Trend({
         </span>
         <span>
           <i className="spend-dot" />
-          Checking spending
+          Expenses
         </span>
       </div>
       {!months.length ? (
@@ -335,7 +351,7 @@ function Trend({
         <div
           className="chart"
           role="group"
-          aria-label="Monthly income and checking spending. Select a month to view its records."
+          aria-label="Monthly income and expenses. Select a month to view its records."
         >
           <div className="chart-guides" aria-hidden="true">
             <span>{money(max)}</span>
@@ -348,7 +364,7 @@ function Trend({
                 className={`month-bar ${data.period.start.startsWith(m.month) && data.period.end.startsWith(m.month) ? "selected" : ""}`}
                 key={m.month}
                 onClick={() => select(m.month)}
-                aria-label={`${m.month}: checking income ${money(m.cashIncome)}, stock transfers ${money(m.stockIncome)}, checking spending ${money(m.spending)}`}
+                aria-label={`${m.month}: cash income ${money(m.cashIncome)}, stock transfers ${money(m.stockIncome)}, expenses ${money(m.spending)}`}
                 title={`${m.month}: checking ${money(m.cashIncome)} · stock ${money(m.stockIncome)} · spending ${money(m.spending)}`}
               >
                 <span className="bar-pair">
@@ -400,11 +416,7 @@ function RecordDetail({
           <span
             className={`status ${event.status === "needs_review" ? "review" : ""}`}
           >
-            {event.status === "needs_review"
-              ? "Unclassified"
-              : event.status === "pending"
-                ? "Pending"
-                : kindNames[event.kind]}
+            {statusName(event)}
           </span>
           <strong>
             {event.amountCents === null ? "Unvalued" : money(event.amountCents)}
@@ -447,7 +459,7 @@ function RecordDetail({
               <div>
                 <dt>Activity / direction</dt>
                 <dd>
-                  {source.activity} · {source.direction}
+                  {source.activity} · {movementDirection(source)}
                 </dd>
               </div>
             </>
@@ -461,7 +473,10 @@ function RecordDetail({
               {displayDate(event.valuation.priceDate)}
             </p>
             <small>
-              {event.valuation.provider}. Original valuation retained.
+              {event.valuation.convention === "provider_transfer_price"
+                ? "Recorded transfer price"
+                : "Saved historical close"}{" "}
+              · {event.valuation.provider}. Original valuation retained.
             </small>
           </div>
         )}
@@ -837,7 +852,7 @@ function App() {
                       className={`status ${data.review.count ? "review" : ""}`}
                     >
                       {data.review.count
-                        ? "Unclassified entries excluded"
+                        ? "Incomplete entries excluded"
                         : "Confirmed records"}
                     </span>
                   </div>
@@ -874,7 +889,7 @@ function App() {
                         <button onClick={() => drill("cash_income")}>
                           <i className="cash-dot" />
                           <span>
-                            Checking income<small>Cash received</small>
+                            Cash income<small>Received by either account</small>
                           </span>
                           <strong>{money(totals.cashIncome)}</strong>
                         </button>
@@ -891,24 +906,30 @@ function App() {
                     <section className="spending-summary">
                       <button
                         className="hero-metric"
-                        aria-label="View checking spending records"
-                        onClick={() => drill("spending")}
+                        aria-label="View total expense records"
+                        onClick={() => drill("expenses")}
                       >
                         <span>
-                          Checking spending <ArrowUpRight size={18} />
+                          Total expenses <ArrowUpRight size={18} />
                         </span>
                         <strong>{money(totals.spending)}</strong>
                       </button>
                       <p>
-                        Includes credit-card payments when paid.
+                        Cash and shares leaving either account.
                         <br />
-                        Individual card purchases are not counted.
+                        Credit-card payments count when paid.
                       </p>
+                      {totals.stockSpending > 0 && (
+                        <p className="help">
+                          Cash payments {money(totals.cashSpending)} · Share
+                          transfers {money(totals.stockSpending)}
+                        </p>
+                      )}
                       <button
                         className="text-button"
-                        onClick={() => drill("spending")}
+                        onClick={() => drill("expenses")}
                       >
-                        Explore payments <ArrowRight size={15} />
+                        Explore expenses <ArrowRight size={15} />
                       </button>
                     </section>
                   </div>
@@ -916,13 +937,13 @@ function App() {
                     <Metric
                       label="Net cash flow"
                       amount={totals.netCashFlow}
-                      note="Checking income − checking spending"
+                      note="Cash income − cash payments"
                       onClick={() => drill("net_cash")}
                     />
                     <Metric
                       label="Net recorded inflow"
                       amount={totals.netRecordedFlow}
-                      note="Cash + in-kind − checking spending"
+                      note="Total income − total expenses"
                       onClick={() => drill("net_recorded")}
                       tone="recorded"
                     />
@@ -968,19 +989,22 @@ function App() {
                     <section className="panel breakdown">
                       <div className="panel-heading">
                         <div>
-                          <h2>Spending breakdown</h2>
+                          <h2>Expense breakdown</h2>
                         </div>
                       </div>
-                      {data.breakdown.filter((b) => b.kind === "spending")
-                        .length ? (
+                      {data.breakdown.filter((b) =>
+                        ["spending", "stock_spending"].includes(b.kind),
+                      ).length ? (
                         data.breakdown
-                          .filter((b) => b.kind === "spending")
+                          .filter((b) =>
+                            ["spending", "stock_spending"].includes(b.kind),
+                          )
                           .sort((a, b) => b.amountCents - a.amountCents)
                           .map((b) => (
                             <button
                               className="breakdown-row"
-                              key={b.category}
-                              onClick={() => drill("spending")}
+                              key={`${b.kind}:${b.category}`}
+                              onClick={() => drill(b.kind as EventKind)}
                             >
                               <span>{b.category}</span>
                               <strong>{money(b.amountCents)}</strong>
@@ -999,8 +1023,7 @@ function App() {
                         </p>
                       )}
                       <p className="help">
-                        Payments leaving checking, including transfers to
-                        accounts outside this pair.
+                        Cash and share transfers leaving the tracked pair.
                       </p>
                     </section>
                   </div>

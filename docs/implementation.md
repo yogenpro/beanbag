@@ -5,6 +5,15 @@ accounts: joint checking and joint brokerage. It is a reporting convention,
 not tax income or credit-card purchase accounting. A separate balance view now
 tracks the latest value/net worth of that selected pair and saved daily history.
 
+Current policy is boundary-2, selected by the owner after the first deployment:
+cash/share transfers in/out of either tracked account are income/expenses;
+internal pair transfers, brokerage dividends/interest/fees and trading are
+excluded. Normal share transfers use their recorded institution price and need
+no per-event origin approval. Current rules apply to saved evidence on read;
+original source/cache records are preserved. Dated owner borrowing confirmations
+take precedence for their own snapshot, with contradictory provider data retained.
+Older checklist entries below describe the original milestone and its gates.
+
 - [x] M0: Worker + React + Hono scaffold, D1 migration and synthetic local spike.
 - [ ] M0 external: independent Plaid consent, product/plan access and one genuine
       incoming securities transfer verified against institution evidence.

@@ -82,6 +82,26 @@ replace the private account configuration. No unattended sync is enabled.
 
 ## Resume locally
 
+The owner's latest accounting convention is **boundary-2**: external cash/share
+transfers into either tracked account are income, external cash/share outflows
+are expenses, and transfers between the pair are excluded. Brokerage dividends,
+interest, fees and trading stay excluded. Normal incoming transfers require no
+per-event origin approval. The owner explicitly selected the institution's
+recorded transfer price instead of requiring a separate arrival-close lookup.
+Legacy normalized sources recover exact price metadata from their unchanged raw
+provider evidence; current rules are applied when reports/details are read,
+without modifying D1 or requesting another sync. Cash flow subtracts only cash
+expenses; net recorded inflow also includes in-kind receipts/outflows. Paired
+internal-transfer legs are counted once in the excluded amount.
+
+A dated owner no-borrowing confirmation is authoritative for its saved snapshot,
+so a contradictory provider figure no longer hides net worth. Both values and
+the calculation basis remain visible in snapshot details. The confirmation is
+not inherited by future observations. These decisions supersede older milestone
+references below to per-receipt approval, mandatory closing-price evidence and
+withheld net worth. Private reconciliation/rollout evidence stays outside this
+public repository. Bank polling remains scheduling-off.
+
 The owner subsequently requested a **strictly read-only dashboard** for simplicity.
 This supersedes the browser review/edit workflow described in the older milestones.
 The current UI has Overview, Activity and Data health; unclassified entries are
@@ -92,7 +112,7 @@ All dashboard API mutations are rejected for every identity (including admins).
 belong to private operator tooling or separately authenticated provider ingestion.
 Hosted consent/repair provisioning needs a private operator path before deployment;
 do not restore browser write routes to complete it. The current automated suite
-has 141 passing tests, including rejection of writes without database/provider
+has 166 passing tests, including rejection of writes without database/provider
 effects. Four desktop/mobile checks cover read-only browsing and no write requests.
 
 The owner also requested current tracked-account value/net worth and a history

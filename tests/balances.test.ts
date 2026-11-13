@@ -114,7 +114,7 @@ describe("account balance observations", () => {
       ).latest?.netWorthCents,
     ).toBeNull();
   });
-  it("preserves contradictory evidence without publishing net worth and rejects stale attestations", async () => {
+  it("uses the owner's dated confirmation for net worth and preserves the conflicting provider value", async () => {
     const repo = new MemoryLedger(accounts);
     await collectBalances(apiFor().api, repo, "synthetic", now, {
       actor: "test-owner",
@@ -129,8 +129,10 @@ describe("account balance observations", () => {
     ).latest;
     expect(point).toMatchObject({
       assetsCents: 3950001,
-      marginLoanCents: 200000,
-      netWorthCents: null,
+      marginLoanCents: 0,
+      reportedMarginLoanCents: 200000,
+      borrowingBasis: "owner_confirmation",
+      netWorthCents: 3950001,
       borrowingConflict: true,
     });
     await expect(

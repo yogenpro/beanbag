@@ -1,4 +1,5 @@
 import { classify } from "../accounting/classify";
+import { transferPricing } from "../providers/plaid/normalize";
 import {
   emptyBalanceHealth,
   type BalanceSnapshot,
@@ -105,17 +106,23 @@ export class D1Ledger implements LedgerRepository {
     const result = await this.db.prepare(sql).all<Record<string, string>>();
     return result.results.map((r) => JSON.parse(r[column]) as T);
   }
-  sources() {
-    return this.jsonRows<Source>(
-      "SELECT record_json FROM source_records ORDER BY id",
-      "record_json",
+  async sources(): Promise<Source[]> {
+    const rows = await this.db
+      .prepare("SELECT record_json, raw_json FROM source_records ORDER BY id")
+      .all<{ record_json: string; raw_json: string }>();
+    return rows.results.map((row) =>
+      transferPricing(JSON.parse(row.record_json), row.raw_json),
     );
   }
-  events() {
-    return this.jsonRows<FinancialEvent>(
-      "SELECT event_json FROM financial_events ORDER BY event_date DESC, id",
-      "event_json",
-    );
+  async events(): Promise<FinancialEvent[]> {
+    // Rules apply to saved evidence immediately, without a sync or browser write.
+    const [sources, accounts, overrides, valuations] = await Promise.all([
+      this.sources(),
+      this.accounts(),
+      this.overrides(),
+      this.valuations(),
+    ]);
+    return reclassify(sources, accounts, overrides, valuations);
   }
   overrides() {
     return this.jsonRows<Override>(
@@ -137,9 +144,14 @@ export class D1Ledger implements LedgerRepository {
       "SELECT coverage_json FROM sync_state",
       "coverage_json",
     );
-    return (["checking", "investments"] as const).map(
-      (p) => stored.find((c) => c.product === p) ?? defaultCoverage(p),
-    );
+    return (["checking", "investments"] as const).map((p) => {
+      const coverage =
+        stored.find((c) => c.product === p) ?? defaultCoverage(p);
+      return p === "investments" &&
+        coverage.limitation.startsWith("Incoming-share coverage is unverified.")
+        ? { ...coverage, limitation: defaultCoverage(p).limitation }
+        : coverage;
+    });
   }
   async cursor(product: Coverage["product"]): Promise<string | null> {
     return (
@@ -280,8 +292,21 @@ export class D1Ledger implements LedgerRepository {
       accounts,
       overrides,
       valuations,
-    ))
+    )) {
+      if (e.valuation)
+        statements.push(
+          this.db
+            .prepare(
+              "INSERT OR IGNORE INTO historical_prices(event_id,valuation_json,created_at) VALUES(?,?,?)",
+            )
+            .bind(
+              e.id,
+              JSON.stringify(e.valuation),
+              commit.coverage.lastSuccess,
+            ),
+        );
       statements.push(this.eventStatement(e));
+    }
     statements.push(
       this.db
         .prepare(

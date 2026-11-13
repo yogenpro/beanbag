@@ -114,6 +114,9 @@ export class MemoryLedger implements LedgerRepository {
       const source = this.records.get(id);
       if (source) this.records.set(id, { ...source, removed: true });
     }
+    for (const event of await this.events())
+      if (event.valuation && !this.prices[event.id])
+        this.prices[event.id] = structuredClone(event.valuation);
     this.health = this.health.map((h) =>
       h.product === commit.product ? commit.coverage : h,
     );

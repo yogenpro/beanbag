@@ -33,14 +33,15 @@ is read-only and has no consent, repair, review or sync controls.
 8. Locate **one genuine external share receipt** in the independently connected
    investment feed. Verify transaction ID, arrival date, direction, external
    origin, stable security ID, quantity, subtype and any cancellation/correction.
-   Positive quantity or a holdings increase is insufficient. If no such event is
-   available, retain incomplete coverage. Verified manual receipt ingestion is a
-   backend capability that needs a private operator path, not a browser form.
-9. Obtain a historical, unadjusted USD closing price for arrival or the last prior
-   trading session from an entitled source. Check its entitlement/rate limits.
-   Save source/date evidence privately for the operator valuation pipeline and
-   compare it with independent decimal arithmetic. Preserve the valuation through a later
-   sale and an internal cash transfer; neither creates more income.
+   The current convention classifies incoming/outgoing transfers automatically;
+   this independent evidence check concerns provider fidelity and complete feed
+   coverage. A holdings increase alone still cannot create a transfer event.
+9. Use the recorded transfer unit price with exact quantity, as selected by the
+   owner. Preserve its provider/date evidence and compare with independent decimal
+   arithmetic. Saved, reviewed historical closes remain a fallback when the
+   transfer price is absent; current holdings prices never fill that gap.
+   Preserve the valuation through a later sale and an internal cash transfer;
+   neither creates more income.
 10. Record the outcome only in private operations notes. A future automatic
     adapter must be backed by a real redacted event and synthetic regression cases.
     Do not copy private data or the original design handoff into this public repo.

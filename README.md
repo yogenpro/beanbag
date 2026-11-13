@@ -56,17 +56,18 @@ It does not connect the illustrative dashboard or change production Access polic
 
 ## Reporting convention
 
-| Movement                                                                      | Treatment                                       |
-| ----------------------------------------------------------------------------- | ----------------------------------------------- |
-| External cash received in selected checking                                   | Checking income                                 |
-| External securities received in selected brokerage                            | In-kind income at historical arrival-date close |
-| Checking payment outside this pair, including card payments                   | Checking spending                               |
-| Checking ↔ selected brokerage cash transfer, including overdraft funding      | Excluded internal transfer                      |
-| Brokerage trades, dividends, interest, corporate actions, appreciation        | Excluded investment activity                    |
-| Pending, unverified receipt, ambiguous transfer, missing historical valuation | Outside confirmed totals; separately visible    |
+| Movement                                                                     | Treatment                                       |
+| ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| External cash received in either selected account                            | Cash income                                     |
+| External securities received in either selected account                      | In-kind income at the recorded transfer price   |
+| External cash payments from either account, including card payments          | Cash expenses                                   |
+| External share transfers out of either account                               | In-kind expenses at the recorded transfer price |
+| Checking ↔ selected brokerage transfer, including overdraft funding          | Excluded internal transfer, counted once        |
+| Brokerage trades, dividends, interest, fees, corporate actions, appreciation | Excluded investment activity                    |
+| Pending, removed, missing direction/identity/quantity or transfer price      | Outside confirmed totals; separately visible    |
 
-`Net cash flow = checking income − checking spending`.
-`Net recorded inflow = checking income + stock income − checking spending`.
+`Net cash flow = cash income − cash expenses`.
+`Net recorded inflow = cash income + stock income − cash expenses − stock expenses`.
 Stock income is not cash or a measure of taxable wages. Card purchase feeds are
 not imported. Transfers to other personal accounts are outside this boundary.
 
@@ -76,18 +77,26 @@ posting dates remain unchanged; date presets use America/Los_Angeles.
 
 Every total has a source drilldown. Review decisions include rationale, reviewer,
 timestamp and source revision. A provider correction preserves the decision and
-raises a review conflict. Sources and classification remain separate.
+raises a review conflict. Sources and classification remain separate. Normal
+incoming transfers require no per-receipt origin approval: unmatched transfers
+are external by convention. Explicit counterpart/mask evidence excludes a
+one-sided internal transfer; unique reciprocal transfer legs with matching
+currency/value and dates within three days are paired automatically. Ordinary
+same-amount payments are not paired as transfers. Ambiguous matches are not
+arbitrarily paired. Original provider records remain available for inspection.
 
 ## Tracked account value
 
 Overview also shows the latest reported checking and brokerage balances and a
 chart of saved daily observations. Tracked net worth is their combined current
-value less reported brokerage borrowing; it covers only these two accounts.
+value less brokerage borrowing; it covers only these two accounts.
 Brokerage cash is already included in its account value. Holdings and stock
 receipt income are never added on top of the balance.
 
 Missing USD balances or borrowing remain unknown. A dated owner confirmation of
-no borrowing can complete one local snapshot; it is not reused for future ones.
+no borrowing is authoritative for that snapshot, including when the provider
+reports a conflicting figure. The provider value and the basis used remain
+visible in snapshot details. Confirmation is not reused for future observations.
 Collection time and institution update time are distinct. Balance data comes
 from existing Plaid products and can be cached; no real-time quote is promised.
 History starts with saved observations, with the latest observation per Pacific
@@ -104,15 +113,17 @@ feasibility spike and an interactive dashboard. See [implementation](docs/implem
 **Live Schwab/Plaid feasibility is unverified.** The app needs its own Plaid
 developer application, product access and new user consent. An existing
 connection in another application supplies no credentials or reusable consent.
-Incoming investment transfers remain review candidates: provider type, positive
-quantity, or holdings increases alone never prove external origin. The stock
-path currently uses reviewed historical quotes/manual receipts; a paid or
-licensed automatic price provider is not selected or enabled.
+The owner's revised flow convention counts unmatched incoming/outgoing transfer
+records automatically, using their exact quantity and recorded unit price. This
+is a reporting convention, not independent proof of every transfer's origin or
+complete feed coverage. Trades/dividends/interest/fees stay excluded. Saved
+historical-close evidence remains supported when a recorded transfer price is
+missing; current holdings prices never substitute for a missing transfer value.
 
 To complete that external gate, follow [Plaid setup and spike](docs/plaid-setup.md).
-Do not claim fully automated share income until a genuine incoming transfer has
-been reconciled to institution evidence. Last successful sync is never presented
-as proof of complete coverage.
+The provider's recorded transfer price is not a tax-income determination or a
+promise of the market closing price. Last successful sync is never presented as
+proof of complete coverage.
 
 ## Deployment contract
 

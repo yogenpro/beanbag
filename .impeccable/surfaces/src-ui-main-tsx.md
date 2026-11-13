@@ -94,6 +94,14 @@ visible. No market values enter receipt-income totals, and no new palette,
 typeface, radius or navigation pattern is introduced. The offline private report
 reuses this component without interactive controls and requires no server.
 
+November 12 flow-rule follow-up: labels now cover cash/share flows in either
+account. Use Cash income, Total expenses and separate cash versus in-kind net
+measures. Transfers use their recorded institution price without per-event
+origin approval. Incomplete entries distinguish missing prices from unknown
+classification. A dated owner borrowing confirmation supplies the snapshot's
+net-worth basis; preserve the differing provider value in expanded details.
+Keep the accepted visual system and the strictly read-only interaction model.
+
 Use only the loopback illustrative repository. Build before browser checks,
 exercise all three views and read-only record details, inspect desktop/mobile
 screenshots, and run the Impeccable detector once. Finish with a visual review of

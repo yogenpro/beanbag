@@ -37,6 +37,8 @@ export type BalancePoint = BalanceSnapshot & {
   marginLoanCents: number | null;
   netWorthCents: number | null;
   borrowingConflict: boolean;
+  reportedMarginLoanCents: number | null;
+  borrowingBasis: "provider" | "owner_confirmation" | "unknown";
 };
 
 export function balancePoint(
@@ -61,29 +63,30 @@ export function balancePoint(
     snapshot.accounts.find((b) => b.accountId === brokerage?.id)
       ?.marginLoanCents ?? null;
   const confirmation = snapshot.borrowingConfirmation;
-  const marginLoanCents =
-    reportedMargin ??
-    (confirmation?.accountId === brokerage?.id &&
+  const confirmedNoBorrowing =
+    confirmation?.accountId === brokerage?.id &&
     confirmation?.amountCents === 0 &&
-    confirmation.actor &&
+    !!confirmation.actor &&
+    Number.isFinite(Date.parse(confirmation.confirmedAt)) &&
     pacificToday(new Date(confirmation.confirmedAt)) ===
-      pacificToday(new Date(snapshot.capturedAt))
-      ? 0
-      : null);
+      pacificToday(new Date(snapshot.capturedAt));
+  const marginLoanCents = confirmedNoBorrowing ? 0 : reportedMargin;
   const borrowingConflict =
-    !!confirmation &&
-    confirmation.accountId === brokerage?.id &&
-    confirmation.amountCents === 0 &&
-    reportedMargin !== null &&
-    reportedMargin > 0;
+    confirmedNoBorrowing && reportedMargin !== null && reportedMargin > 0;
   return {
     ...snapshot,
     date: pacificToday(new Date(snapshot.capturedAt)),
     assetsCents,
     marginLoanCents,
     borrowingConflict,
+    reportedMarginLoanCents: reportedMargin,
+    borrowingBasis: confirmedNoBorrowing
+      ? "owner_confirmation"
+      : reportedMargin !== null
+        ? "provider"
+        : "unknown",
     netWorthCents:
-      assetsCents !== null && marginLoanCents !== null && !borrowingConflict
+      assetsCents !== null && marginLoanCents !== null
         ? sumCents([assetsCents, -marginLoanCents])
         : null,
   };

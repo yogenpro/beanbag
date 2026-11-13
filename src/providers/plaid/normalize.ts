@@ -1,5 +1,6 @@
 import { cents } from "../../accounting/money";
 import { validDate } from "../../accounting/dates";
+import { parse } from "lossless-json";
 import type {
   BankSource,
   InvestmentSource,
@@ -65,8 +66,6 @@ export async function normalizeInvestment(
   const security = securities.find((s) => s.security_id === raw.security_id);
   const activity = string(raw.type),
     subtype = typeof raw.subtype === "string" ? raw.subtype : undefined;
-  // Do not promote schema-level transfer/positive quantity into verified external origin.
-  // Schwab representation must first be proved using a real, independently linked event.
   const record = await withRevision({
     kind: "investment" as const,
     id: string(raw.investment_transaction_id),
@@ -82,7 +81,10 @@ export async function normalizeInvestment(
       typeof security?.ticker_symbol === "string"
         ? security.ticker_symbol
         : undefined,
+    securityType:
+      typeof security?.type === "string" ? security.type : undefined,
     quantity: raw.quantity == null ? undefined : decimalText(raw.quantity),
+    unitPrice: raw.price == null ? undefined : decimalText(raw.price),
     cashAmountCents: -cents(decimalText(raw.amount)),
     direction: "unknown" as const,
     origin: "unknown" as const,
@@ -94,5 +96,43 @@ export async function normalizeInvestment(
   return {
     record,
     raw: rawJson({ transaction: raw, security: security ?? null }),
+  };
+}
+
+/** Enrich older stored normalizations from their unchanged original provider evidence. */
+export function transferPricing(source: Source, raw: string): Source {
+  if (source.kind !== "investment" || source.activity !== "transfer")
+    return source;
+  let evidence: JsonRecord;
+  try {
+    evidence = parse(raw) as JsonRecord;
+  } catch {
+    return source;
+  }
+  const transaction = evidence?.transaction;
+  if (
+    transaction?.investment_transaction_id !== source.id ||
+    transaction.type !== "transfer" ||
+    transaction.account_id !== source.accountId ||
+    transaction.date !== source.date ||
+    transaction.security_id !== source.securityId
+  )
+    return source;
+  let unitPrice = source.unitPrice;
+  if (unitPrice === undefined && transaction.price != null) {
+    try {
+      unitPrice = decimalText(transaction.price);
+    } catch {
+      /* Keep malformed legacy pricing unvalued. */
+    }
+  }
+  return {
+    ...source,
+    securityType:
+      source.securityType ??
+      (typeof evidence.security?.type === "string"
+        ? evidence.security.type
+        : undefined),
+    unitPrice,
   };
 }

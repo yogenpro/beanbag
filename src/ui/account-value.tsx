@@ -24,8 +24,7 @@ export function AccountValue({
   const { latest, history } = data;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const labelId = useId();
-  const net =
-    !latest || (latest.marginLoanCents !== null && !latest.borrowingConflict);
+  const net = !latest || latest.marginLoanCents !== null;
   const value = (point: BalancePoint) =>
     net ? point.netWorthCents : point.assetsCents;
   const index = Math.min(
@@ -118,7 +117,12 @@ export function AccountValue({
               );
             })}
             <div>
-              <dt>Brokerage borrowing</dt>
+              <dt>
+                Brokerage borrowing
+                {latest.borrowingBasis === "owner_confirmation"
+                  ? " · owner confirmed"
+                  : ""}
+              </dt>
               <dd>{amount(latest.marginLoanCents)}</dd>
             </div>
           </dl>
@@ -126,9 +130,8 @@ export function AccountValue({
       )}
       {!net && (
         <p className="balance-warning">
-          {latest?.borrowingConflict
-            ? "Reported brokerage borrowing conflicts with the owner’s confirmation, so net worth is not shown."
-            : "Borrowing wasn’t reported. This is account value before any brokerage loan; net worth is unavailable."}
+          Borrowing wasn’t reported. This is account value before any brokerage
+          loan; net worth is unavailable.
         </p>
       )}
       {data.stale && (
@@ -309,6 +312,14 @@ export function AccountValue({
                 No brokerage borrowing was confirmed by the owner for this
                 snapshot on{" "}
                 {timestamp(latest.borrowingConfirmation.confirmedAt)}.
+              </p>
+            )}
+            {latest.borrowingConflict && (
+              <p className="help">
+                Net worth uses the owner’s no-borrowing confirmation for this
+                snapshot. The provider reported{" "}
+                {amount(latest.reportedMarginLoanCents)}; that figure is
+                retained separately and is not deducted.
               </p>
             )}
             <dl className="balance-source-times">

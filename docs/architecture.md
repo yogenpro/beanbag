@@ -72,12 +72,24 @@ prototype and must be measured before a large backfill or long-lived deployment.
 
 ## Stock receipts and historical prices
 
-Plaid investment transfers are unverified candidates. Buys, sells, cash dividends,
-interest, splits and reinvestments are excluded. A receipt needs stable security
-identity, exact positive quantity, incoming direction, external-origin evidence
-and the last unadjusted USD trading-session close on/before arrival.
+Under boundary-2, external cash/share transfers into either tracked account count
+as income and corresponding external outflows as expenses. Unmatched transfers
+are external by the owner's reporting convention. Stable counterpart/mask evidence
+or unique reciprocal transfer legs identify internal movements; both legs share
+a group so excluded amounts are counted once. Ordinary non-transfer payments and
+ambiguous matches are not arbitrarily paired. Trades, brokerage dividends,
+interest, fees, splits and reinvestments stay excluded.
 
-`HistoricalPriceProvider` defines the adapter boundary. The first adapter accepts
+Shares use exact absolute quantity times the institution's unit price on the
+original transfer record, with direction from its signed position movement.
+This recorded price has its own valuation convention; it is not labeled a market
+close. Missing identity/quantity/direction/price stays outside totals. Older
+normalized records recover pricing from their unchanged, lossless raw evidence.
+D1 reports and detail views apply current rules to saved evidence without database
+writes, so a deployment immediately reclassifies existing records. Derived event
+rows remain a sync-time cache rather than the report's rule authority.
+
+`HistoricalPriceProvider` remains the fallback adapter boundary. It accepts
 reviewed historical evidence with price/source/session date; no current quote
 fallback exists. Quotes more than seven calendar days before arrival require
 manual investigation rather than silently accepting a stale price. The reviewer
@@ -106,9 +118,11 @@ subtracted once. Missing values/currencies are never silently zeroed or converte
 Both responses must validate before publishing one immutable observation and
 its success status in a transaction. Failure leaves old snapshots intact with
 independent error status; out-of-order attempts cannot replace newer health.
-A local owner attestation can supply zero borrowing for just that observation
-if the provider omits it; contradictory provider borrowing preserves both pieces
-of evidence and withholds net worth pending reconciliation.
+A dated owner attestation supplies zero borrowing for just that observation and
+takes precedence over a contradictory provider figure. Both pieces of evidence
+remain available; the report identifies the owner confirmation as its borrowing
+basis and shows net worth using that basis. Future unconfirmed snapshots use
+their own reported/unknown borrowing, never an inherited confirmation.
 The original missing provider field and the dated attestation remain distinct.
 
 The API returns the latest snapshot independently of the selected report period,

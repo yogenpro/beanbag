@@ -13,7 +13,10 @@ describe("two-account boundary", () => {
     ["payroll", bank(), "cash_income", 400000],
     [
       "one-sided checking to brokerage",
-      bank({ description: "Transfer to Brokerage", amountCents: -1000000 }),
+      bank({
+        description: "Transfer to Brokerage -0002",
+        amountCents: -1000000,
+      }),
       "internal_transfer",
       1000000,
     ],
@@ -119,25 +122,22 @@ describe("two-account boundary", () => {
     expect(event.amountCents).toBe(expectedCents);
     expect(event.status).toBe("confirmed");
   });
-  it("requires review for an ambiguous brokerage move or different masked brokerage", () => {
+  it("treats unmatched cash movements and other brokerages as external flows", () => {
     expect(
       classify(bank({ description: "Brokerage cash movement" }), accounts)
         .status,
-    ).toBe("needs_review");
+    ).toBe("confirmed");
     expect(
       classify(
         bank({ description: "Overdraft Transfer from Brokerage -9999" }),
         accounts,
-      ).status,
-    ).toBe("needs_review");
+      ).kind,
+    ).toBe("cash_income");
   });
   it.each([
-    { direction: "unknown" },
-    { origin: "unknown" },
     { securityId: undefined },
     { quantity: undefined },
     { quantity: "0" },
-    { evidence: undefined },
   ] as const)(
     "keeps uncertain share receipt out of confirmed income: %o",
     (patch) => {
@@ -162,7 +162,7 @@ describe("two-account boundary", () => {
       classify(
         bank({
           id: "proceeds",
-          description: "Transfer from Brokerage",
+          description: "Transfer from Brokerage -0002",
           amountCents: 2200000,
         }),
         accounts,
@@ -342,11 +342,11 @@ describe("report reconciliation and Pacific dates", () => {
       cashIncome: 400000,
       stockIncome: 2000000,
       totalIncome: 2400000,
-      spending: 350000,
-      netCashFlow: 50000,
-      netRecordedFlow: 2050000,
+      spending: 355000,
+      netCashFlow: 45000,
+      netRecordedFlow: 2045000,
     });
-    expect(r.review).toMatchObject({ count: 2, unvalued: 1, knownCents: 5000 });
+    expect(r.review).toMatchObject({ count: 1, unvalued: 1, knownCents: 0 });
   });
   it("uses Pacific date through UTC midnight and daylight-saving boundaries", () => {
     expect(pacificToday(new Date("2026-09-01T01:00:00Z"))).toBe("2026-08-31");

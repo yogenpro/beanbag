@@ -99,6 +99,8 @@ is not recovery proof until an isolated restore has passed these checks.
 - **Historical investment corrections:** the automated overlap is 90 days.
   Explicitly run additional bounded service windows when reconciling older data.
   There is no public backfill/admin-SQL endpoint.
-- **Missing historical price or origin evidence:** leave the receipt excluded.
-  Obtain a trustworthy historical close and verified receipt evidence for private
-  operator ingestion, with the provider ID when known. Never use today's quote.
+- **Missing transfer value:** normal incoming/outgoing transfers need no separate
+  origin approval. Read the recorded price from the original transaction; if it
+  is absent, leave the amount unvalued or supply reviewed historical-close
+  evidence through private tooling. Never use today's quote. Source corrections
+  and duplicate records remain distinct from normal automatic classification.

@@ -89,7 +89,12 @@ export function demoLedger(now = new Date()): MemoryLedger {
       ),
     );
     sources.push(
-      bank(`brokerage-${date}`, `${date}-06`, "Transfer to Brokerage", -80000),
+      bank(
+        `brokerage-${date}`,
+        `${date}-06`,
+        "Transfer to Brokerage -0002",
+        -80000,
+      ),
     );
   }
   const receipt: InvestmentSource = {
@@ -120,13 +125,28 @@ export function demoLedger(now = new Date()): MemoryLedger {
     direction: "unknown",
     evidence: undefined,
   });
+  sources.push({
+    ...receipt,
+    id: "demo-automatic-stock",
+    description: "EXM · Recorded share transfer",
+    quantity: "7.25",
+    unitPrice: "186.125",
+    origin: "unknown",
+    direction: "unknown",
+    evidence: undefined,
+  });
+  sources.push({
+    ...receipt,
+    id: "demo-outgoing-stock",
+    description: "EXM · External share withdrawal",
+    quantity: "-1.5",
+    unitPrice: "186.125",
+    origin: "unknown",
+    direction: "unknown",
+    evidence: undefined,
+  });
   sources.push(
-    bank(
-      "demo-review-bank",
-      `${current}-01`,
-      "Brokerage cash movement · unknown destination",
-      -47500,
-    ),
+    bank("demo-review-bank", `${current}-01`, "External cash transfer", -47500),
   );
   sources.push(
     bank(
@@ -173,6 +193,14 @@ export function demoLedger(now = new Date()): MemoryLedger {
     lastAttempt: now.toISOString(),
     lastSuccess: now.toISOString(),
     error: null,
+  };
+  const latest = repo.snapshots.at(-1)!;
+  latest.accounts[1].marginLoanCents = 87000;
+  latest.borrowingConfirmation = {
+    accountId: accounts[1].id,
+    actor: "illustrative-owner",
+    confirmedAt: latest.capturedAt,
+    amountCents: 0,
   };
   const priceDate = receipt.date;
   const valuation: Valuation = {

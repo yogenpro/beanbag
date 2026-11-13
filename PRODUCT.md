@@ -14,7 +14,7 @@ from the repository's README and AGENTS.md and the owner's implementation brief.
 
 ## Product Purpose
 
-Explain what entered the household, what left checking, and what moved between
+Explain what entered or left the tracked account pair, and what moved between
 the two accounts, alongside their latest value and saved balance history.
 Every reported amount must lead back to its records and
 classification evidence.
@@ -29,13 +29,13 @@ invented records; the separate private integration ledger is not its data source
 
 ## Capabilities and Constraints
 
-- Posted external checking receipts are cash income. Checking payments,
-  including credit-card payments when paid, are spending.
-- Incoming external shares are recorded separately as in-kind income using exact
-  quantity times a historical arrival-date close. They are neither cash income
-  nor an inferred tax figure.
+- External cash receipts into either account are cash income; external cash
+  payments from either are expenses, including credit-card payments when paid.
+- Incoming/outgoing external shares are in-kind income/expenses using exact
+  quantity times the recorded transfer price. Normal transfers require no
+  per-receipt origin approval. They are neither cash flows nor inferred tax figures.
 - Pending and unresolved records stay outside confirmed totals. Internal cash
-  transfers, investment trades, and brokerage dividends are excluded.
+  transfers, investment trades, and brokerage dividends, interest and fees are excluded.
 - A successful sync does not establish complete reporting coverage.
 - On November 12, 2026, the owner requested a strictly read-only dashboard for
   simplicity. This supersedes browser classification, receipt-entry, connection

@@ -16,7 +16,19 @@ export function report(events: FinancialEvent[], period: Period) {
     );
   const cashIncome = total("cash_income"),
     stockIncome = total("stock_income"),
-    spending = total("spending");
+    cashSpending = total("spending"),
+    stockSpending = total("stock_spending"),
+    spending = sumCents([cashSpending, stockSpending]);
+  const transfers = new Map<string, number>();
+  for (const event of records.filter(
+    (e) => e.kind === "internal_transfer" && e.status === "confirmed",
+  )) {
+    const group = event.transferGroup ?? event.id;
+    transfers.set(
+      group,
+      Math.max(transfers.get(group) ?? 0, event.amountCents ?? 0),
+    );
+  }
   const unresolved = records.filter((e) => e.status === "needs_review");
   const months = [...new Set(records.map((e) => e.date.slice(0, 7)))].sort();
   return {
@@ -26,9 +38,11 @@ export function report(events: FinancialEvent[], period: Period) {
       stockIncome,
       totalIncome: sumCents([cashIncome, stockIncome]),
       spending,
-      netCashFlow: sumCents([cashIncome, -spending]),
+      cashSpending,
+      stockSpending,
+      netCashFlow: sumCents([cashIncome, -cashSpending]),
       netRecordedFlow: sumCents([cashIncome, stockIncome, -spending]),
-      internalTransfers: total("internal_transfer"),
+      internalTransfers: sumCents([...transfers.values()]),
     },
     review: {
       count: unresolved.length,
@@ -40,9 +54,17 @@ export function report(events: FinancialEvent[], period: Period) {
       month,
       cashIncome: sumForMonth("cash_income", month),
       stockIncome: sumForMonth("stock_income", month),
-      spending: sumForMonth("spending", month),
+      spending: sumCents([
+        sumForMonth("spending", month),
+        sumForMonth("stock_spending", month),
+      ]),
     })),
-    breakdown: ["cash_income", "stock_income", "spending"].flatMap((kind) => {
+    breakdown: [
+      "cash_income",
+      "stock_income",
+      "spending",
+      "stock_spending",
+    ].flatMap((kind) => {
       const filtered = records.filter(
         (e) => e.kind === kind && e.status === "confirmed",
       );

@@ -29,7 +29,7 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
   }).format(before.balances.latest.netWorthCents / 100);
   await expect(balances.locator(".balance-total")).toHaveText(total);
   expect(before.totals.netCashFlow).toBe(
-    before.totals.cashIncome - before.totals.spending,
+    before.totals.cashIncome - before.totals.cashSpending,
   );
   expect(before.totals.netRecordedFlow).toBe(
     before.totals.cashIncome +
@@ -43,22 +43,26 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
   await expect(slider).toHaveValue("0");
   await balances.getByText("Snapshots & freshness", { exact: true }).click();
   await expect(balances.getByRole("table")).toBeVisible();
+  await expect(
+    balances.getByText(/Net worth uses the owner’s no-borrowing confirmation/),
+  ).toBeVisible();
+  await expect(page.getByText(/so net worth is not shown/)).toHaveCount(0);
   await page.getByRole("button", { name: "Last month", exact: true }).click();
   await expect(balances.locator(".balance-total")).toHaveText(total);
   await page.getByRole("button", { name: "This month", exact: true }).click();
   await page
-    .getByRole("button", { name: "View checking spending records" })
+    .getByRole("button", { name: "View total expense records" })
     .click();
-  await expect(page.getByLabel("Filter activity")).toHaveValue("spending");
+  await expect(page.getByLabel("Filter activity")).toHaveValue("expenses");
   await page.locator("#overview-tab").click();
   await page.getByRole("button", { name: "View entries", exact: true }).click();
   await expect(page.getByLabel("Filter activity")).toHaveValue("unclassified");
   await expect(
-    page.getByRole("heading", { name: /Unclassified entries/ }),
+    page.getByRole("heading", { name: /Incomplete entries/ }),
   ).toBeVisible();
   await page
     .getByRole("button", {
-      name: "Brokerage cash movement · unknown destination",
+      name: "EXM · Share transfer",
       exact: true,
     })
     .click();
@@ -130,6 +134,29 @@ test("date controls, pending facts, historical valuation and data-health refresh
     .click();
   await expect(
     page.getByRole("dialog").getByText("Historical valuation", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog").locator("form, input, textarea, select"),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "EXM · Recorded share transfer", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByText(/Recorded transfer price/),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByLabel("Filter activity").selectOption("stock_spending");
+  await page
+    .getByRole("button", {
+      name: "EXM · External share withdrawal",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByText("Outgoing stock transfers", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("dialog").locator("form, input, textarea, select"),

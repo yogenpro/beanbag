@@ -59,11 +59,15 @@ export function reclassify(
       accounts,
       latest.get(eventId(s)),
       valuations[eventId(s)],
-      matches.has(eventId(s)),
+      matches.get(eventId(s)) ?? false,
     ),
   );
   for (const event of events) {
-    if (event.kind !== "stock_income" || event.status !== "confirmed") continue;
+    if (
+      !["stock_income", "stock_spending"].includes(event.kind) ||
+      event.status !== "confirmed"
+    )
+      continue;
     const source = sources.find((s) => eventId(s) === event.id)!;
     if (source.kind !== "investment") continue;
     const duplicates = sources.filter(
@@ -76,8 +80,8 @@ export function reclassify(
         s.securityId === source.securityId &&
         s.quantity !== undefined &&
         source.quantity !== undefined &&
-        positiveDecimal(s.quantity) &&
-        positiveDecimal(source.quantity) &&
+        positiveDecimal(s.quantity.replace(/^-/, "")) &&
+        positiveDecimal(source.quantity.replace(/^-/, "")) &&
         decimalIdentity(s.quantity) === decimalIdentity(source.quantity) &&
         eventId(s) !== event.id &&
         events.find((e) => e.id === eventId(s))?.kind !== "ignored",
@@ -85,7 +89,7 @@ export function reclassify(
     if (duplicates.length) {
       event.status = "needs_review";
       event.reason =
-        "Possible duplicate share receipt; reconcile manual and provider evidence before counting";
+        "Possible duplicate share transfer; reconcile manual and provider evidence before counting";
     }
   }
   return events;
@@ -102,7 +106,7 @@ export function defaultCoverage(product: Coverage["product"]): Coverage {
     startDate: null,
     limitation:
       product === "investments"
-        ? "Incoming-share coverage is unverified. A real transfer must be checked against institution evidence; use reviewed manual receipts meanwhile."
+        ? "External cash and share transfers use the current flow rules and recorded prices. A successful sync does not establish complete transfer coverage."
         : "Not connected. Provider refresh times do not establish a complete-through date.",
   };
 }

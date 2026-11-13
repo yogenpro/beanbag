@@ -114,9 +114,9 @@ the command exit unsuccessfully without claiming complete coverage.
 It also collects a balance snapshot independently of the transaction products.
 `npm run local -- balances` collects only balances, using the existing authorized
 products. `npm run local -- balances --confirm-no-borrowing` records an explicit
-owner attestation for this snapshot only if brokerage borrowing is omitted by
-the provider. Use the flag only after the owner confirms no current borrowing;
-it never overrides a positive reported loan or applies to future observations.
+owner attestation for this snapshot. Use the flag only after the owner confirms
+no current borrowing. It takes precedence for that observation, while preserving
+any differing provider figure; it is not applied to future observations.
 No unattended collection is enabled by these commands. Future explicit syncs
 and the hosted scheduled entry point collect new observations when run.
 
@@ -146,9 +146,10 @@ disagreements against the institution before treating the net figure as verified
 Privately reconcile external checking receipts, card payments and internal
 transfers. Verify a genuine incoming share receipt's date, quantity, stable
 security identity, incoming direction and external origin against institution
-evidence. Positive quantity alone remains insufficient. The CLI does not approve
-reviews or infer historical values; automatic historical pricing and live
-share-transfer coverage remain open feasibility gates.
+evidence when investigating discrepancies. Normal transfers now follow the
+owner's external-flow convention without per-event approval and use their recorded
+transfer price. Missing price/quantity/identity remains unvalued; current holdings
+quotes are not substituted. Feed completeness is a separate feasibility question.
 
 Only one local command may hold `command.lock` at a time. Normal completion
 removes the lock. After a crash, verify the process has stopped before manually
