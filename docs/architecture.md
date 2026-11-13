@@ -118,12 +118,12 @@ subtracted once. Missing values/currencies are never silently zeroed or converte
 Both responses must validate before publishing one immutable observation and
 its success status in a transaction. Failure leaves old snapshots intact with
 independent error status; out-of-order attempts cannot replace newer health.
-A dated owner attestation supplies zero borrowing for just that observation and
-takes precedence over a contradictory provider figure. Both pieces of evidence
-remain available; the report identifies the owner confirmation as its borrowing
-basis and shows net worth using that basis. Future unconfirmed snapshots use
-their own reported/unknown borrowing, never an inherited confirmation.
-The original missing provider field and the dated attestation remain distinct.
+Each observation uses its own reported borrowing, so borrowing and repayment
+change net worth normally. Borrowing can exceed assets and produce negative net
+worth. Zero is valid; a missing loan balance remains unknown rather than becoming
+zero. No owner attestation can override the calculation. Legacy confirmations
+remain in immutable stored observations for compatibility, but new collections
+never create them and the dashboard does not display them.
 
 The API returns the latest snapshot independently of the selected report period,
 plus the latest saved observation per Pacific day in that period. A changed

@@ -196,12 +196,6 @@ export function demoLedger(now = new Date()): MemoryLedger {
   };
   const latest = repo.snapshots.at(-1)!;
   latest.accounts[1].marginLoanCents = 87000;
-  latest.borrowingConfirmation = {
-    accountId: accounts[1].id,
-    actor: "illustrative-owner",
-    confirmedAt: latest.capturedAt,
-    amountCents: 0,
-  };
   const priceDate = receipt.date;
   const valuation: Valuation = {
     securityId: receipt.securityId!,

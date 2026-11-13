@@ -76,72 +76,88 @@ function apiFor(
 }
 
 describe("account balance observations", () => {
-  it("uses a dated owner confirmation only for the collected snapshot when borrowing is omitted", async () => {
-    const raw = rawBrokerage() as any;
-    raw.accounts[0].balances.margin_loan_amount = null;
-    const repo = new MemoryLedger(accounts);
-    await collectBalances(
-      apiFor(rawChecking(), raw).api,
-      repo,
-      "synthetic",
-      now,
-      { actor: "test-owner", confirmedAt: now().toISOString() },
-    );
-    const result = balanceReport(
-      await repo.balanceSnapshots(),
-      accounts,
-      await repo.balanceHealth(),
-      period,
-      now(),
-    );
-    expect(result.latest?.netWorthCents).toBe(3950001);
-    expect(result.latest?.accounts[1].marginLoanCents).toBeNull();
-    expect(result.latest?.borrowingConfirmation?.actor).toBe("test-owner");
-    const tomorrow = () => new Date("2026-08-16T18:00:00Z");
-    await collectBalances(
-      apiFor(rawChecking(), raw).api,
-      repo,
-      "synthetic",
-      tomorrow,
-    );
-    expect(
-      balanceReport(
-        await repo.balanceSnapshots(),
+  it.each([0, 200000, 5000000])(
+    "calculates net worth automatically with %i cents of borrowing, including negative equity",
+    async (borrowing) => {
+      const raw = rawBrokerage();
+      raw.accounts[0].balances.margin_loan_amount = String(borrowing / 100);
+      const repo = new MemoryLedger(accounts);
+      await collectBalances(
+        apiFor(rawChecking(), raw).api,
+        repo,
+        "synthetic",
+        now,
+      );
+      const saved = await repo.balanceSnapshots();
+      const point = balanceReport(
+        saved,
         accounts,
         await repo.balanceHealth(),
         period,
-        tomorrow(),
-      ).latest?.netWorthCents,
-    ).toBeNull();
-  });
-  it("uses the owner's dated confirmation for net worth and preserves the conflicting provider value", async () => {
+        now(),
+      ).latest;
+      expect(point).toMatchObject({
+        assetsCents: 3950001,
+        marginLoanCents: borrowing,
+        netWorthCents: 3950001 - borrowing,
+      });
+      expect(saved[0].borrowingConfirmation).toBeUndefined();
+    },
+  );
+  it.each([null, 200000])(
+    "preserves legacy confirmations without letting them replace reported borrowing %s",
+    (borrowing) => {
+      const legacy = snapshot();
+      legacy.accounts[1].marginLoanCents = borrowing;
+      legacy.borrowingConfirmation = {
+        accountId: accounts[1].id,
+        confirmedAt: now().toISOString(),
+        actor: "test-owner",
+        amountCents: 0,
+      };
+      const original = structuredClone(legacy);
+      const point = balanceReport(
+        [legacy],
+        accounts,
+        emptyBalanceHealth(),
+        period,
+        now(),
+      ).latest;
+      expect(point?.marginLoanCents).toBe(borrowing);
+      expect(point?.netWorthCents).toBe(
+        borrowing === null ? null : 3950000 - borrowing,
+      );
+      expect(legacy).toEqual(original);
+    },
+  );
+  it("records borrowing and repayment in history without changing the account boundary or requiring confirmations", async () => {
     const repo = new MemoryLedger(accounts);
-    await collectBalances(apiFor().api, repo, "synthetic", now, {
-      actor: "test-owner",
-      confirmedAt: now().toISOString(),
-    });
-    const point = balanceReport(
+    for (const [day, borrowing] of [
+      [15, "0"],
+      [16, "2000"],
+      [17, "0"],
+    ] as const) {
+      const raw = rawBrokerage();
+      raw.accounts[0].balances.margin_loan_amount = borrowing;
+      await collectBalances(
+        apiFor(rawChecking(), raw).api,
+        repo,
+        "synthetic",
+        () => new Date(`2026-08-${day}T18:00:00Z`),
+      );
+    }
+    const points = balanceReport(
       await repo.balanceSnapshots(),
       accounts,
       await repo.balanceHealth(),
       period,
       now(),
-    ).latest;
-    expect(point).toMatchObject({
-      assetsCents: 3950001,
-      marginLoanCents: 0,
-      reportedMarginLoanCents: 200000,
-      borrowingBasis: "owner_confirmation",
-      netWorthCents: 3950001,
-      borrowingConflict: true,
-    });
-    await expect(
-      collectBalances(apiFor().api, repo, "synthetic", now, {
-        actor: "test-owner",
-        confirmedAt: "2026-08-10T18:00:00Z",
-      }),
-    ).rejects.toThrow("BORROWING_CONFIRMATION_EXPIRED");
-    expect(await repo.balanceSnapshots()).toHaveLength(1);
+    );
+    expect(points.history.map((p) => p.netWorthCents)).toEqual([
+      3950001, 3750001, 3950001,
+    ]);
+    expect(points.latest?.marginLoanCents).toBe(0);
+    expect(await repo.events()).toEqual([]);
   });
   it("uses exact current balances, subtracts borrowing once, ignores available cash and extra holdings", async () => {
     const cash = rawChecking();

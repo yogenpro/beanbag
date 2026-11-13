@@ -14,6 +14,7 @@ export type BalanceSnapshot = {
   capturedAt: string;
   provider: string;
   accounts: AccountBalance[];
+  // Legacy evidence stays in stored observations; it never overrides balances.
   borrowingConfirmation?: {
     accountId: string;
     confirmedAt: string;
@@ -36,9 +37,6 @@ export type BalancePoint = BalanceSnapshot & {
   assetsCents: number | null;
   marginLoanCents: number | null;
   netWorthCents: number | null;
-  borrowingConflict: boolean;
-  reportedMarginLoanCents: number | null;
-  borrowingBasis: "provider" | "owner_confirmation" | "unknown";
 };
 
 export function balancePoint(
@@ -59,32 +57,14 @@ export function balancePoint(
   const assetsCents = complete
     ? sumCents(balances.map((b) => b!.currentCents!))
     : null;
-  const reportedMargin =
+  const marginLoanCents =
     snapshot.accounts.find((b) => b.accountId === brokerage?.id)
       ?.marginLoanCents ?? null;
-  const confirmation = snapshot.borrowingConfirmation;
-  const confirmedNoBorrowing =
-    confirmation?.accountId === brokerage?.id &&
-    confirmation?.amountCents === 0 &&
-    !!confirmation.actor &&
-    Number.isFinite(Date.parse(confirmation.confirmedAt)) &&
-    pacificToday(new Date(confirmation.confirmedAt)) ===
-      pacificToday(new Date(snapshot.capturedAt));
-  const marginLoanCents = confirmedNoBorrowing ? 0 : reportedMargin;
-  const borrowingConflict =
-    confirmedNoBorrowing && reportedMargin !== null && reportedMargin > 0;
   return {
     ...snapshot,
     date: pacificToday(new Date(snapshot.capturedAt)),
     assetsCents,
     marginLoanCents,
-    borrowingConflict,
-    reportedMarginLoanCents: reportedMargin,
-    borrowingBasis: confirmedNoBorrowing
-      ? "owner_confirmation"
-      : reportedMargin !== null
-        ? "provider"
-        : "unknown",
     netWorthCents:
       assetsCents !== null && marginLoanCents !== null
         ? sumCents([assetsCents, -marginLoanCents])

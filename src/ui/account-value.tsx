@@ -116,22 +116,25 @@ export function AccountValue({
                 </div>
               );
             })}
-            <div>
-              <dt>
-                Brokerage borrowing
-                {latest.borrowingBasis === "owner_confirmation"
-                  ? " · owner confirmed"
-                  : ""}
-              </dt>
-              <dd>{amount(latest.marginLoanCents)}</dd>
-            </div>
+            {latest.marginLoanCents !== 0 && (
+              <div>
+                <dt>Brokerage borrowing</dt>
+                <dd>
+                  {amount(
+                    latest.marginLoanCents === null
+                      ? null
+                      : -latest.marginLoanCents,
+                  )}
+                </dd>
+              </div>
+            )}
           </dl>
         </div>
       )}
       {!net && (
         <p className="balance-warning">
-          Borrowing wasn’t reported. This is account value before any brokerage
-          loan; net worth is unavailable.
+          Brokerage borrowing is unavailable. Showing account value before
+          borrowing.
         </p>
       )}
       {data.stale && (
@@ -297,8 +300,9 @@ export function AccountValue({
           )}
           <p className="balance-method">
             {net ? "Net worth" : "Account value"} for these two accounts only.
-            Changes include market movements and money entering or leaving; they
-            are not investment returns. Gaps have no recorded balance.
+            {net ? " Reported brokerage borrowing is deducted." : ""} Changes
+            include market movements and money entering or leaving; they are not
+            investment returns. Gaps have no recorded balance.
           </p>
           <details className="balance-details">
             <summary>Snapshots & freshness</summary>
@@ -307,21 +311,6 @@ export function AccountValue({
               received the data; institution balances may be older.
               Stock-receipt income keeps its original historical value.
             </p>
-            {latest.borrowingConfirmation && (
-              <p className="help">
-                No brokerage borrowing was confirmed by the owner for this
-                snapshot on{" "}
-                {timestamp(latest.borrowingConfirmation.confirmedAt)}.
-              </p>
-            )}
-            {latest.borrowingConflict && (
-              <p className="help">
-                Net worth uses the owner’s no-borrowing confirmation for this
-                snapshot. The provider reported{" "}
-                {amount(latest.reportedMarginLoanCents)}; that figure is
-                retained separately and is not deducted.
-              </p>
-            )}
             <dl className="balance-source-times">
               {accounts.map((account) => {
                 const balance = latest.accounts.find(

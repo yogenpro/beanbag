@@ -21,7 +21,6 @@ npm run local -- complete-link           Retrieve consent and validate the two-a
 npm run local -- cancel-link             Discard unfinished consent or retry pending Item cleanup
 npm run local -- sync                    Reconcile transactions and save a balance snapshot
 npm run local -- balances                Save a balance snapshot from existing product data
-npm run local -- balances --confirm-no-borrowing  Attest zero brokerage borrowing for this snapshot only
 npm run local -- status                  Show connection and product health, without amounts
 npm run local -- report [START END]      Write private evidence.json (month by default)
 
@@ -55,13 +54,7 @@ export async function main(
         "status",
         "report",
       ].includes(command) ||
-      (args.length !== 1 &&
-        !(command === "report" && args.length === 3) &&
-        !(
-          command === "balances" &&
-          args.length === 2 &&
-          args[1] === "--confirm-no-borrowing"
-        ))
+      (args.length !== 1 && !(command === "report" && args.length === 3))
     )
       throw new LocalError(
         "Unknown command or arguments. Run npm run local -- help.",
@@ -152,15 +145,7 @@ export async function main(
           }
         }
         try {
-          await collectBalances(
-            api,
-            store.repo,
-            token,
-            () => new Date(),
-            args.includes("--confirm-no-borrowing")
-              ? { actor: store.actor, confirmedAt: new Date().toISOString() }
-              : undefined,
-          );
+          await collectBalances(api, store.repo, token);
           output(
             "balances: saved a snapshot; institution balances may be cached.\n",
           );

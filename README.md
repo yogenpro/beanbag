@@ -93,10 +93,10 @@ value less brokerage borrowing; it covers only these two accounts.
 Brokerage cash is already included in its account value. Holdings and stock
 receipt income are never added on top of the balance.
 
-Missing USD balances or borrowing remain unknown. A dated owner confirmation of
-no borrowing is authoritative for that snapshot, including when the provider
-reports a conflicting figure. The provider value and the basis used remain
-visible in snapshot details. Confirmation is not reused for future observations.
+Borrowing is a normal liability: each snapshot automatically subtracts its
+reported margin loan, including zero borrowing, later borrowing and repayment.
+No owner confirmation is needed. Missing USD balances or borrowing remain unknown;
+the dashboard shows account value before borrowing when a net total is unavailable.
 Collection time and institution update time are distinct. Balance data comes
 from existing Plaid products and can be cached; no real-time quote is promised.
 History starts with saved observations, with the latest observation per Pacific

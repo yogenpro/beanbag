@@ -3,7 +3,6 @@ import type {
   BalanceSnapshot,
 } from "../../accounting/balances";
 import { cents } from "../../accounting/money";
-import { pacificToday } from "../../accounting/dates";
 import type { Account } from "../../accounting/types";
 import type { LedgerRepository } from "../../data/repository";
 import {
@@ -54,7 +53,6 @@ export async function collectBalances(
   repo: LedgerRepository,
   token: string,
   now = () => new Date(),
-  noBorrowing?: { actor: string; confirmedAt: string },
 ): Promise<void> {
   try {
     const accounts = await repo.accounts();
@@ -80,21 +78,6 @@ export async function collectBalances(
         normalize(brokerage, investments.accounts),
       ],
     };
-    if (noBorrowing) {
-      if (
-        !noBorrowing.actor ||
-        !Number.isFinite(Date.parse(noBorrowing.confirmedAt)) ||
-        pacificToday(new Date(noBorrowing.confirmedAt)) !==
-          pacificToday(new Date(snapshot.capturedAt))
-      )
-        throw new ProviderError("BORROWING_CONFIRMATION_EXPIRED");
-      if (snapshot.accounts[1].marginLoanCents !== 0)
-        snapshot.borrowingConfirmation = {
-          ...noBorrowing,
-          accountId: brokerage.id,
-          amountCents: 0,
-        };
-    }
     await repo.saveBalanceSnapshot(snapshot);
   } catch (error) {
     await repo.failBalanceRefresh(

@@ -94,10 +94,12 @@ without modifying D1 or requesting another sync. Cash flow subtracts only cash
 expenses; net recorded inflow also includes in-kind receipts/outflows. Paired
 internal-transfer legs are counted once in the excluded amount.
 
-A dated owner no-borrowing confirmation is authoritative for its saved snapshot,
-so a contradictory provider figure no longer hides net worth. Both values and
-the calculation basis remain visible in snapshot details. The confirmation is
-not inherited by future observations. These decisions supersede older milestone
+The owner subsequently rejected confirmation-dependent borrowing. Net worth now
+automatically subtracts each snapshot's reported brokerage borrowing. Zero debt,
+borrowing and repayment use the same calculation; borrowing can produce negative
+net worth. Legacy confirmations are preserved as stored evidence but never
+override calculations or appear in the UI. Missing borrowing remains unknown.
+These decisions supersede older milestone
 references below to per-receipt approval, mandatory closing-price evidence and
 withheld net worth. Private reconciliation/rollout evidence stays outside this
 public repository. Bank polling remains scheduling-off.
@@ -112,7 +114,7 @@ All dashboard API mutations are rejected for every identity (including admins).
 belong to private operator tooling or separately authenticated provider ingestion.
 Hosted consent/repair provisioning needs a private operator path before deployment;
 do not restore browser write routes to complete it. The current automated suite
-has 166 passing tests, including rejection of writes without database/provider
+has 170 passing tests, including rejection of writes without database/provider
 effects. Four desktop/mobile checks cover read-only browsing and no write requests.
 
 The owner also requested current tracked-account value/net worth and a history

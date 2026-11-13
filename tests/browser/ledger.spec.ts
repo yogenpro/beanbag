@@ -28,6 +28,22 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
     currency: "USD",
   }).format(before.balances.latest.netWorthCents / 100);
   await expect(balances.locator(".balance-total")).toHaveText(total);
+  expect(before.balances.latest.marginLoanCents).toBeGreaterThan(0);
+  expect(before.balances.latest.netWorthCents).toBe(
+    before.balances.latest.assetsCents - before.balances.latest.marginLoanCents,
+  );
+  await expect(
+    balances.locator(".balance-breakdown").getByText("Brokerage borrowing"),
+  ).toBeVisible();
+  await expect(
+    balances.locator(".balance-breakdown").getByText(
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(-before.balances.latest.marginLoanCents / 100),
+      { exact: true },
+    ),
+  ).toBeVisible();
   expect(before.totals.netCashFlow).toBe(
     before.totals.cashIncome - before.totals.cashSpending,
   );
@@ -43,9 +59,7 @@ test("read-only dashboard: totals, charts, filters and record evidence without w
   await expect(slider).toHaveValue("0");
   await balances.getByText("Snapshots & freshness", { exact: true }).click();
   await expect(balances.getByRole("table")).toBeVisible();
-  await expect(
-    balances.getByText(/Net worth uses the owner’s no-borrowing confirmation/),
-  ).toBeVisible();
+  await expect(balances.getByText(/owner|confirm|conflict/i)).toHaveCount(0);
   await expect(page.getByText(/so net worth is not shown/)).toHaveCount(0);
   await page.getByRole("button", { name: "Last month", exact: true }).click();
   await expect(balances.locator(".balance-total")).toHaveText(total);

@@ -113,10 +113,9 @@ the command exit unsuccessfully without claiming complete coverage.
 
 It also collects a balance snapshot independently of the transaction products.
 `npm run local -- balances` collects only balances, using the existing authorized
-products. `npm run local -- balances --confirm-no-borrowing` records an explicit
-owner attestation for this snapshot. Use the flag only after the owner confirms
-no current borrowing. It takes precedence for that observation, while preserving
-any differing provider figure; it is not applied to future observations.
+products. Each snapshot uses its reported assets and margin borrowing to calculate
+net worth automatically. No borrowing confirmation flag is required or supported;
+legacy attestation metadata is preserved but does not override reported balances.
 No unattended collection is enabled by these commands. Future explicit syncs
 and the hosted scheduled entry point collect new observations when run.
 

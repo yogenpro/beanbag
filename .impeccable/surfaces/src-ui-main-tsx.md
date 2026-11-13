@@ -98,8 +98,9 @@ November 12 flow-rule follow-up: labels now cover cash/share flows in either
 account. Use Cash income, Total expenses and separate cash versus in-kind net
 measures. Transfers use their recorded institution price without per-event
 origin approval. Incomplete entries distinguish missing prices from unknown
-classification. A dated owner borrowing confirmation supplies the snapshot's
-net-worth basis; preserve the differing provider value in expanded details.
+classification. Net worth subtracts each snapshot's reported borrowing natively.
+Show a borrowing deduction when nonzero; no owner-confirmation labels or workflow.
+Unknown borrowing shows account value before borrowing instead of an invented zero.
 Keep the accepted visual system and the strictly read-only interaction model.
 
 Use only the loopback illustrative repository. Build before browser checks,

@@ -10,8 +10,9 @@ cash/share transfers in/out of either tracked account are income/expenses;
 internal pair transfers, brokerage dividends/interest/fees and trading are
 excluded. Normal share transfers use their recorded institution price and need
 no per-event origin approval. Current rules apply to saved evidence on read;
-original source/cache records are preserved. Dated owner borrowing confirmations
-take precedence for their own snapshot, with contradictory provider data retained.
+original source/cache records are preserved. Net worth automatically subtracts
+each snapshot's reported borrowing. No confirmation workflow or owner override
+is needed; missing provider borrowing remains unknown.
 Older checklist entries below describe the original milestone and its gates.
 
 - [x] M0: Worker + React + Hono scaffold, D1 migration and synthetic local spike.
