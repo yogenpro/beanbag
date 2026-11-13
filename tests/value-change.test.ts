@@ -69,6 +69,36 @@ const points = [
 ];
 
 describe("account value change attribution", () => {
+  it("uses daily cash and in-kind flows for TWR rather than dividing total gain by opening value", () => {
+    const daily = [
+      point("2026-07-31", 10000),
+      point("2026-08-01", 22000),
+      point("2026-08-02", 10900),
+    ];
+    const events = [
+      flow("cash", "cash_income", 5000, "2026-08-01"),
+      flow("stock", "stock_income", 5000, "2026-08-01"),
+      flow("cash-out", "spending", 6000, "2026-08-02"),
+      flow("stock-out", "stock_spending", 4000, "2026-08-02"),
+      flow("trade", "ignored", 99999, "2026-08-01"),
+      flow("pending", "cash_income", 99999, "2026-08-01", "pending"),
+      {
+        ...flow("outside", "cash_income", 99999, "2026-08-01"),
+        accountId: "outside",
+      },
+    ];
+    const result = accountValueChange(daily, events, accounts, coverage, {
+      start: "2026-08-01",
+      end: "2026-08-02",
+    });
+    expect(result).toMatchObject({
+      investmentCents: 900,
+      netFlowCents: 0,
+      timeWeightedReturn: { status: "estimated", days: 2 },
+    });
+    expect(result.timeWeightedReturn.rate).toBeCloseTo(0.045, 12);
+    expect(result.timeWeightedReturn.rate).not.toBe(900 / 10000);
+  });
   it("reconciles cash and share income, all external expenses and a loss despite growing net value", () => {
     const events = [
       flow("cash", "cash_income", 100000),
@@ -103,6 +133,11 @@ describe("account value change attribution", () => {
       expensesCents: 40000,
       netFlowCents: 80000,
       investmentCents: -40000,
+      timeWeightedReturn: {
+        status: "unavailable",
+        reason: "missing_daily_values",
+        rate: null,
+      },
     });
     expect(result.netFlowCents! + result.investmentCents!).toBe(
       result.changeCents,
@@ -165,6 +200,11 @@ describe("account value change attribution", () => {
       changeCents: 40000,
       investmentCents: null,
       netFlowCents: null,
+      timeWeightedReturn: {
+        status: "unavailable",
+        reason: "missing_history",
+        rate: null,
+      },
     });
   });
   it.each([
@@ -174,7 +214,11 @@ describe("account value change attribution", () => {
   ])("withholds residuals when a flow is unresolved: $id", (event) => {
     expect(
       accountValueChange(points, [event], accounts, coverage, period),
-    ).toMatchObject({ reason: "unresolved_flows", investmentCents: null });
+    ).toMatchObject({
+      reason: "unresolved_flows",
+      investmentCents: null,
+      timeWeightedReturn: { reason: "unresolved_flows", rate: null },
+    });
   });
   it("distinguishes genuine zero flows, gains and negative account equity from missing data", () => {
     expect(

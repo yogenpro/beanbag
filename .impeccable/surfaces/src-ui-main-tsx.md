@@ -142,3 +142,10 @@ cards or new controls. The detector's advisory about this existing size is a
 documentation-ramp gap, not a new visual direction. Preserve the accepted design
 artifacts. Desktop/mobile checks cover the equation, a loss despite growing
 account value, period changes, missing history and no write requests.
+
+Time-weighted return is a fourth amount beside investment gain/loss. Reuse the
+same typography and open ruled treatment; use two columns at intermediate widths
+and stack on phones. Label it as a daily estimate for the period and explain
+flow timing in the existing calculation details. Missing daily values or
+undefined percentage bases leave TWR unavailable while preserving any supported
+dollar attribution. Preserve the existing net-worth/account-value fallback guard.

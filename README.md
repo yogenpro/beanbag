@@ -154,6 +154,18 @@ gain. Missing transaction windows or unresolved external flows leave the split
 unavailable rather than attributing unexplained movement to investments. This
 read-only calculation changes no source record, saved balance or income total.
 
+Time-weighted return appears beside the dollar gain/loss as a daily estimate for
+the same comparison dates. Each daily growth factor is `(ending net value +
+external outflows) / (opening net value + external inflows)`; the period return
+is the product of those factors minus one. Incoming cash/shares start the day,
+outgoing cash/shares end it. The result is not annualized. This follows a
+[documented daily flow convention](https://help.portfolio-performance.info/en/concepts/performance/time-weighted/)
+and [geometric linking of subperiod returns](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/).
+Missing daily values, unresolved flows and undefined capital bases withhold the
+percentage independently of the dollar estimate. Reconstructed values, saved
+flow dates and transfer-price differences affect accuracy; this is not a claim
+of exact intraday or standards-certified performance.
+
 ## Status and the real-data feasibility gate
 
 The first implementation milestone provides the accounting backend, synthetic

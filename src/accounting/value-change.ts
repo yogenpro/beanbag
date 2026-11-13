@@ -3,6 +3,11 @@ import { transactionCoverage } from "./coverage";
 import { assertPeriod, type Period } from "./dates";
 import { sumCents } from "./money";
 import { report } from "./report";
+import {
+  dailyTimeWeightedReturn,
+  unavailableReturn,
+  type TimeWeightedReturn,
+} from "./returns";
 import type { Account, Coverage, FinancialEvent } from "./types";
 
 export type ValueChange = {
@@ -18,6 +23,7 @@ export type ValueChange = {
   expensesCents: number | null;
   netFlowCents: number | null;
   investmentCents: number | null;
+  timeWeightedReturn: TimeWeightedReturn;
 };
 const shiftDay = (date: string, days: number) =>
   new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
@@ -46,6 +52,7 @@ export function accountValueChange(
     expensesCents: null,
     netFlowCents: null,
     investmentCents: null,
+    timeWeightedReturn: unavailableReturn("missing_balances"),
   };
   const ids = accounts
     .map((a) => a.id)
@@ -85,6 +92,7 @@ export function accountValueChange(
   // A balance curve alone cannot establish that an unexplained deposit was a gain.
   if (transactionCoverage(coverage, flowPeriod).status !== "available") {
     result.reason = "missing_history";
+    result.timeWeightedReturn = unavailableReturn("missing_history");
     return result;
   }
   const selectedIds = new Set(accounts.map((a) => a.id));
@@ -110,6 +118,7 @@ export function accountValueChange(
     )
   ) {
     result.reason = "unresolved_flows";
+    result.timeWeightedReturn = unavailableReturn("unresolved_flows");
     return result;
   }
   const { totals } = report(records, flowPeriod);
@@ -121,5 +130,25 @@ export function accountValueChange(
     expensesCents: totals.spending,
     netFlowCents: totals.netRecordedFlow,
     investmentCents: sumCents([result.changeCents!, -totals.netRecordedFlow]),
+    timeWeightedReturn: dailyTimeWeightedReturn(
+      usable.map((p) => ({
+        date: p.date,
+        valueCents: p.netWorthCents!,
+        reconstructed: p.historyMethods?.includes("reconstructed"),
+      })),
+      records
+        .filter((e) => e.status === "confirmed" && flowKinds.has(e.kind))
+        .map((e) => ({
+          date: e.date,
+          inflowCents: ["cash_income", "stock_income"].includes(e.kind)
+            ? e.amountCents!
+            : 0,
+          outflowCents: ["spending", "stock_spending"].includes(e.kind)
+            ? e.amountCents!
+            : 0,
+        })),
+      opening.date,
+      closing.date,
+    ),
   };
 }
