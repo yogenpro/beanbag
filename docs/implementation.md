@@ -38,14 +38,24 @@ first-day flows, in-kind outflows, negative equity, borrowing, partial periods,
 losses during account growth, missing history, period changes and read-only API
 behavior. The local private offline report reuses the same calculation.
 
-The change breakdown now includes a nonannualized, daily-linked time-weighted
-return estimate. Incoming and outgoing cash/share flows stay separate so that
+The change breakdown now includes a daily-linked time-weighted return estimate
+inline with investment gain/loss. Cumulative period TWR is retained, with an
+additional annualized rate for more than one calendar year of actual covered
+history, using compound growth on an actual-days/365 basis. Leap-year
+anniversaries and shorter available comparisons do not trigger annualization.
+Incoming and outgoing cash/share flows stay separate so that
 same-day flows do not cancel before return weighting. Daily net values include
 borrowing once. Empty initial days and initial funding are supported; missing
 daily points, negative equity, undefined denominators and numerical overflow
 leave the percentage unavailable. Dollar attribution keeps its independent
 availability. New tests cover compounding, cash/in-kind capital flows, complete
 losses, funding/withdrawals, precision, missing daily values and unchanged inputs.
+
+Expense-breakdown drilldowns match both kind and category, show the active
+category and allow clearing it. Saved Plaid loan-payment details distinguish
+credit-card payments and other payments; legacy sources recover these labels
+from matching raw evidence on reads without rewriting the ledger. Expense
+totals, transfer rules, source revisions and recorded valuations are preserved.
 
 - [x] M0: Worker + React + Hono scaffold, D1 migration and synthetic local spike.
 - [ ] M0 external: independent Plaid consent, product/plan access and one genuine

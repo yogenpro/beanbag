@@ -143,9 +143,13 @@ documentation-ramp gap, not a new visual direction. Preserve the accepted design
 artifacts. Desktop/mobile checks cover the equation, a loss despite growing
 account value, period changes, missing history and no write requests.
 
-Time-weighted return is a fourth amount beside investment gain/loss. Reuse the
-same typography and open ruled treatment; use two columns at intermediate widths
-and stack on phones. Label it as a daily estimate for the period and explain
-flow timing in the existing calculation details. Missing daily values or
-undefined percentage bases leave TWR unavailable while preserving any supported
-dollar attribution. Preserve the existing net-worth/account-value fallback guard.
+Compact performance refinement: the owner requested TWR in the investment
+gain/loss row, reducing the breakdown to three groups. Keep the dollar amount
+primary and cumulative TWR as inline labelled metadata. Add annualized TWR only
+for more than one calendar year of covered history. Let the line wrap at narrow
+widths without a separate metric, card or divider. Keep the estimate label and
+explain timing and the 365-day compounding basis in the existing details.
+Missing daily values or undefined bases leave TWR unavailable while preserving
+supported dollar attribution and the net-worth/account-value fallback guard.
+Expense-breakdown links open the exact category and kind in Activity, with a
+visible removable category filter. Preserve the accepted palette and controls.

@@ -4,6 +4,7 @@ import { sumCents } from "./money";
 export type TimeWeightedReturn = {
   status: "estimated" | "unavailable";
   rate: number | null;
+  annualizedRate: number | null;
   reason:
     | "missing_balances"
     | "missing_history"
@@ -23,6 +24,7 @@ export const unavailableReturn = (
 ): TimeWeightedReturn => ({
   status: "unavailable",
   rate: null,
+  annualizedRate: null,
   reason,
   method: "daily_start_inflows_end_outflows",
   days: 0,
@@ -123,5 +125,14 @@ export function dailyTimeWeightedReturn(
   if (!investedDays) return { ...result, reason: "no_invested_capital" };
   const rate = Math.expm1(logGrowth);
   if (!Number.isFinite(rate)) return { ...result, reason: "numeric_range" };
-  return { ...result, status: "estimated", reason: null, rate };
+  // More than one calendar year of actual covered history, including leap years.
+  const anniversary = new Date(openingDate + "T00:00:00Z");
+  const openingMonth = anniversary.getUTCMonth();
+  anniversary.setUTCFullYear(anniversary.getUTCFullYear() + 1);
+  if (anniversary.getUTCMonth() !== openingMonth) anniversary.setUTCDate(0);
+  const annualizedRate =
+    Date.parse(closingDate) > anniversary.getTime()
+      ? Math.expm1((logGrowth * 365) / result.days)
+      : null;
+  return { ...result, status: "estimated", reason: null, rate, annualizedRate };
 }

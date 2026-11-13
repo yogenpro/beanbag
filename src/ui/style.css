@@ -284,7 +284,7 @@ label select {
 }
 .value-change-amounts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr);
   gap: 24px;
   margin: 0 0 16px;
 }
@@ -307,6 +307,32 @@ label select {
 .value-change-estimate {
   display: block;
 }
+.value-change-performance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.value-change-return {
+  font-size: 0.93rem;
+  letter-spacing: normal;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+.value-change-return strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+.value-change-performance .value-change-estimate {
+  flex-basis: 100%;
+}
+.activity-category {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
 .value-change-details {
   margin-top: 16px;
 }
@@ -323,6 +349,9 @@ label select {
 @media (min-width: 701px) and (max-width: 1100px) {
   .value-change-amounts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .value-change-amounts > div:last-child {
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 700px) {

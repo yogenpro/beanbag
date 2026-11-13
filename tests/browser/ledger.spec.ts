@@ -3,6 +3,259 @@ import { report } from "../../src/accounting/report";
 import { accountValueChange } from "../../src/accounting/value-change";
 import { balancePoint } from "../../src/accounting/balances";
 
+test("expense categories open their exact posted records and clear back to cash payments", async ({
+  page,
+}) => {
+  const fixture = await (await page.request.get("/api/report")).json();
+  expect(fixture.illustrative).toBe(true);
+  await page.clock.install({ time: new Date("2026-11-12T20:00:00Z") });
+  const sample = fixture.records.find(
+    (e: { kind: string }) => e.kind === "spending",
+  );
+  const events = [
+    {
+      ...sample,
+      id: "invented-card-a",
+      date: "2026-11-02",
+      description: "Invented ACH payment A",
+      category: "Credit-card payments",
+      amountCents: 12500,
+      status: "confirmed",
+    },
+    {
+      ...sample,
+      id: "invented-card-b",
+      date: "2026-11-03",
+      description: "Invented ACH payment B",
+      category: "Credit-card payments",
+      amountCents: 5000,
+      status: "confirmed",
+    },
+    {
+      ...sample,
+      id: "invented-other",
+      date: "2026-11-04",
+      description: "Invented other debit",
+      category: "Other payments",
+      amountCents: 20000,
+      status: "confirmed",
+    },
+    {
+      ...sample,
+      id: "invented-pending",
+      date: "2026-11-05",
+      description: "Invented pending debit",
+      category: "Credit-card payments",
+      amountCents: 90000,
+      status: "pending",
+    },
+    {
+      ...sample,
+      id: "invented-removed",
+      date: "2026-11-06",
+      description: "Invented removed debit",
+      category: "Credit-card payments",
+      amountCents: 90000,
+      status: "removed",
+    },
+  ];
+  await page.route("**/api/report*", (route) => {
+    const url = new URL(route.request().url());
+    const result = report(events, {
+      start: url.searchParams.get("start")!,
+      end: url.searchParams.get("end")!,
+    });
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...fixture, ...result, trend: result.months }),
+    });
+  });
+  const writes: string[] = [];
+  page.on("request", (r) => {
+    if (!["GET", "HEAD"].includes(r.method())) writes.push(r.method());
+  });
+  await page.goto("/");
+  const category = page
+    .locator(".breakdown-row")
+    .filter({ hasText: "Credit-card payments" });
+  await expect(category.locator("strong")).toHaveText("$175.00");
+  await category.click();
+  await expect(
+    page.getByRole("heading", { name: "Account activity", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".activity-category")).toContainText(
+    "Credit-card payments",
+  );
+  await expect(page.locator("#records tbody tr")).toHaveCount(2);
+  await expect(page.locator("#records .record-link")).toHaveText([
+    "Invented ACH payment B",
+    "Invented ACH payment A",
+  ]);
+  await expect(page.locator("#records .amount")).toContainText([
+    "−$50.00",
+    "−$125.00",
+  ]);
+  await page
+    .locator("#records")
+    .screenshot({
+      path: `test-results/expense-category-${test.info().project.name}.png`,
+    });
+  await page
+    .getByRole("button", { name: "Clear category filter", exact: true })
+    .click();
+  await expect(page.locator("#records tbody tr")).toHaveCount(3);
+  await expect(page.locator(".activity-category")).toHaveCount(0);
+  await page.locator("#overview-tab").click();
+  await page
+    .locator(".breakdown-row")
+    .filter({ hasText: "Other payments" })
+    .click();
+  await expect(page.locator("#records tbody tr")).toHaveCount(1);
+  await expect(page.locator("#records .record-link")).toHaveText(
+    "Invented other debit",
+  );
+  await page.getByLabel("Filter activity").selectOption("all");
+  await expect(page.locator(".activity-category")).toHaveCount(0);
+  await expect(page.locator("#records tbody tr")).toHaveCount(4);
+  expect(writes).toEqual([]);
+});
+
+test("annualized TWR joins investment gain/loss only for more than a year of covered values", async ({
+  page,
+}) => {
+  const fixture = await (await page.request.get("/api/report")).json();
+  expect(fixture.illustrative).toBe(true);
+  await page.clock.install({ time: new Date("2026-11-12T20:00:00Z") });
+  const points = Array.from({ length: 731 }, (_, i) => {
+    const date = new Date(Date.parse("2024-11-12") + i * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    return balancePoint(
+      {
+        capturedAt: date + "T20:00:00Z",
+        asOfDate: date,
+        provider: "Invented daily values",
+        historyMethods: ["institution_export"],
+        accounts: fixture.accounts.map((a: { id: string }, j: number) => ({
+          accountId: a.id,
+          currentCents: null,
+          netValueCents: j ? 900000 + Math.round((i * 210000) / 730) : 100000,
+          marginLoanCents: null,
+          currency: "USD",
+          institutionUpdatedAt: null,
+        })),
+      },
+      fixture.accounts,
+    );
+  });
+  const coverage = fixture.coverage.map((c: object) => ({
+    ...c,
+    history: {
+      start: "2024-11-13",
+      end: "2026-11-12",
+      source: "Invented history",
+      retrievedAt: "2026-11-12T20:00:00Z",
+    },
+  }));
+  let shortHistory = false,
+    missingDaily = false;
+  await page.route("**/api/report*", (route) => {
+    const url = new URL(route.request().url()),
+      period = {
+        start: url.searchParams.get("start")!,
+        end: url.searchParams.get("end")!,
+      };
+    const available = points.filter(
+      (p) =>
+        (!shortHistory || p.date >= "2026-10-11") &&
+        (!missingDaily || p.date !== "2025-07-01"),
+    );
+    const result = report([], period);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...fixture,
+        ...result,
+        trend: result.months,
+        coverage,
+        availablePeriod: { start: "2024-11-13", end: "2026-11-12" },
+        balances: {
+          ...fixture.balances,
+          latest: points.at(-1),
+          stale: false,
+          history: available.filter(
+            (p) => p.date >= period.start && p.date <= period.end,
+          ),
+          change: accountValueChange(
+            available,
+            [],
+            fixture.accounts,
+            coverage,
+            period,
+          ),
+        },
+      }),
+    });
+  });
+  const writes: string[] = [];
+  page.on("request", (r) => {
+    if (!["GET", "HEAD"].includes(r.method())) writes.push(r.method());
+  });
+  await page.goto("/");
+  const group = page.getByRole("group", {
+    name: "Account value change breakdown",
+    exact: true,
+  });
+  const annualized = group.getByRole("group", {
+    name: "Annualized time-weighted return",
+    exact: true,
+  });
+  await expect(annualized).toHaveCount(0);
+  await page.getByRole("tab", { name: "Max", exact: true }).click();
+  await expect(group.locator(".value-change-amounts > div")).toHaveCount(3);
+  const performance = group.locator(".value-change-amounts > div").nth(2);
+  await expect(performance).toContainText("+$2,100.00");
+  await expect(
+    performance.getByRole("group", {
+      name: "Time-weighted return",
+      exact: true,
+    }),
+  ).toContainText("+21.00%");
+  await expect(annualized).toContainText("+10.00%");
+  await group.screenshot({
+    path: `test-results/annualized-twr-${test.info().project.name}.png`,
+  });
+  await page.getByRole("tab", { name: "Last year", exact: true }).click();
+  await expect(annualized).toHaveCount(0);
+  await page.getByRole("tab", { name: "Max", exact: true }).click();
+  shortHistory = true;
+  await page.reload();
+  await page.getByRole("tab", { name: "Max", exact: true }).click();
+  await expect(
+    group.getByText(/covers part of the selected period/),
+  ).toBeVisible();
+  await expect(annualized).toHaveCount(0);
+  shortHistory = false;
+  missingDaily = true;
+  await page.reload();
+  await page.getByRole("tab", { name: "Max", exact: true }).click();
+  await expect(
+    performance.getByRole("group", {
+      name: "Time-weighted return",
+      exact: true,
+    }),
+  ).toContainText("Unavailable");
+  await expect(annualized).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+  expect(writes).toEqual([]);
+});
+
 test("historical ranges change rendered totals and distinguish missing history from zero", async ({
   page,
 }) => {
@@ -686,8 +939,18 @@ test("value change separates net income from estimated investment loss and expla
     "$1,200.00 income − $300.00 expenses",
   );
   await expect(amounts.nth(2).locator("dd")).toContainText("-$400.00");
-  await expect(amounts.nth(3).locator("dt")).toHaveText("Time-weighted return");
-  await expect(amounts.nth(3).locator("dd")).toContainText("-3.68%");
+  await expect(amounts).toHaveCount(3);
+  await expect(
+    amounts
+      .nth(2)
+      .getByRole("group", { name: "Time-weighted return", exact: true }),
+  ).toContainText("-3.68%");
+  await expect(
+    group.getByRole("group", {
+      name: "Annualized time-weighted return",
+      exact: true,
+    }),
+  ).toHaveCount(0);
   await group.getByText("How this is calculated", { exact: true }).click();
   await expect(
     group.getByText(/not a rate of return or taxable gain/),
@@ -718,7 +981,11 @@ test("value change separates net income from estimated investment loss and expla
   missingDailyValue = true;
   await page.reload();
   await expect(amounts.nth(2).locator("dd")).toContainText("-$400.00");
-  await expect(amounts.nth(3).locator("dd")).toContainText("Unavailable");
+  await expect(
+    amounts
+      .nth(2)
+      .getByRole("group", { name: "Time-weighted return", exact: true }),
+  ).toContainText("Unavailable");
   await expect(
     group.getByText(/needs a net value for every day/),
   ).toBeVisible();

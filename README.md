@@ -158,13 +158,23 @@ Time-weighted return appears beside the dollar gain/loss as a daily estimate for
 the same comparison dates. Each daily growth factor is `(ending net value +
 external outflows) / (opening net value + external inflows)`; the period return
 is the product of those factors minus one. Incoming cash/shares start the day,
-outgoing cash/shares end it. The result is not annualized. This follows a
+outgoing cash/shares end it. Cumulative TWR sits inline with investment gain/loss.
+For comparisons longer than one calendar year, annualized TWR is also shown as
+`(1 + cumulative TWR) ** (365 / elapsed days) - 1`. Use the actual covered dates,
+including any shorter available comparison; a one-year or shorter comparison
+is never annualized, including a calendar year with a leap day. This follows a
 [documented daily flow convention](https://help.portfolio-performance.info/en/concepts/performance/time-weighted/)
 and [geometric linking of subperiod returns](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/).
 Missing daily values, unresolved flows and undefined capital bases withhold the
 percentage independently of the dollar estimate. Reconstructed values, saved
 flow dates and transfer-price differences affect accuracy; this is not a claim
 of exact intraday or standards-certified performance.
+
+Expense categories use saved provider detail where available: Plaid's broad
+loan-payment category includes credit-card payments. Specific credit-card and
+other-payment details receive matching labels without changing expense amounts.
+Selecting a breakdown row opens only the confirmed records with that event kind
+and category. The active category is visible and can be cleared in Activity.
 
 ## Status and the real-data feasibility gate
 

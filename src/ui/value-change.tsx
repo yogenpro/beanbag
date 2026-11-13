@@ -3,6 +3,14 @@ import { displayDate, money } from "./api";
 
 const signed = (value: number | null) =>
   value === null ? "Unavailable" : `${value > 0 ? "+" : ""}${money(value)}`;
+const percent = (value: number | null | undefined) =>
+  value == null
+    ? "Unavailable"
+    : `${value > 0 ? "+" : ""}${new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+      }).format(value)}`;
 
 export function ValueChangeBreakdown({ data }: { data: ValueChange | null }) {
   if (!data) return null;
@@ -48,20 +56,26 @@ export function ValueChangeBreakdown({ data }: { data: ValueChange | null }) {
             </div>
             <div>
               <dt>Investment gain/loss</dt>
-              <dd>
-                {signed(data.investmentCents)}
-                <span className="value-change-estimate">Estimate</span>
-              </dd>
-            </div>
-            <div>
-              <dt>Time-weighted return</dt>
-              <dd>
-                {twr?.rate === null || !twr
-                  ? "Unavailable"
-                  : `${twr.rate > 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(twr.rate)}`}
-                <span className="value-change-estimate">
-                  Daily estimate · period return
+              <dd className="value-change-performance">
+                <span>{signed(data.investmentCents)}</span>
+                <span
+                  className="value-change-return"
+                  role="group"
+                  aria-label="Time-weighted return"
+                >
+                  <span>TWR</span> <strong>{percent(twr?.rate)}</strong>
                 </span>
+                {twr?.annualizedRate != null && (
+                  <span
+                    className="value-change-return"
+                    role="group"
+                    aria-label="Annualized time-weighted return"
+                  >
+                    <span>Annualized</span>{" "}
+                    <strong>{percent(twr.annualizedRate)}</strong>
+                  </span>
+                )}
+                <span className="value-change-estimate">Estimates</span>
               </dd>
             </div>
           </dl>
@@ -112,10 +126,14 @@ export function ValueChangeBreakdown({ data }: { data: ValueChange | null }) {
             <p className="help">
               Time-weighted return compounds daily returns after adjusting for
               external cash and share flows. Incoming flows are assumed to
-              arrive at the start of each day and outgoing flows at the end.
-              This is the return over the displayed period, without annualizing;
-              intraday valuations are unavailable. Brokerage dividends, interest
-              and fees remain in performance.
+              arrive at the start of each day and outgoing flows at the end. TWR
+              is the cumulative return over the compared dates; intraday
+              valuations are unavailable. When those dates span more than one
+              calendar year, annualized TWR is also shown using compound growth
+              on a 365-day basis: (1 + TWR) raised to (365 / elapsed days),
+              minus one. A shorter available comparison is never annualized just
+              because the selected range is longer. Brokerage dividends,
+              interest and fees remain in performance.
             </p>
             {(data.estimatedBalances || twr?.usesReconstructedValues) && (
               <p className="help">

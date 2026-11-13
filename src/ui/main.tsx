@@ -147,6 +147,7 @@ function Records({
   records,
   accounts,
   filter,
+  category,
   setFilter,
   open,
   compact = false,
@@ -155,6 +156,7 @@ function Records({
   records: FinancialEvent[];
   accounts: Dashboard["accounts"];
   filter: Filter;
+  category?: string | null;
   setFilter: (v: Filter) => void;
   open: (e: FinancialEvent) => void;
   compact?: boolean;
@@ -162,6 +164,7 @@ function Records({
 }) {
   const items = records
     .filter((e) => {
+      if (category && e.category !== category) return false;
       if (filter === "unclassified") return e.status === "needs_review";
       if (filter === "pending") return e.status === "pending";
       if (filter === "all") return true;
@@ -217,6 +220,14 @@ function Records({
           </select>
         </label>
       </div>
+      {category && (
+        <p className="help activity-category">
+          <span>Category: {category}</span>
+          <button className="text-button" onClick={() => setFilter(filter)}>
+            Clear category filter
+          </button>
+        </p>
+      )}
       {!items.length ? (
         <div className="empty">
           <CheckCheck size={28} />
@@ -644,6 +655,7 @@ function App() {
   const [availablePeriod, setAvailablePeriod] = useState<Period>();
   const [tab, setTab] = useState<Tab>("overview"),
     [filter, setFilter] = useState<Filter>("all"),
+    [category, setCategory] = useState<string | null>(null),
     [detail, setDetail] = useState<Detail | null>(null);
   const request = useRef(0);
   const options = periodOptions(selection.tab, availablePeriod);
@@ -677,8 +689,13 @@ function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [tab]);
-  function drill(value: Filter) {
+  function changeFilter(value: Filter) {
     setFilter(value);
+    setCategory(null);
+  }
+  function drill(value: Filter, category: string | null = null) {
+    setFilter(value);
+    setCategory(category);
     setTab("activity");
   }
   async function open(e: FinancialEvent) {
@@ -717,7 +734,7 @@ function App() {
               key={value}
               onClick={() => {
                 setTab(value);
-                if (value === "activity") setFilter("all");
+                if (value === "activity") changeFilter("all");
               }}
               className={tab === value ? "active" : ""}
               aria-current={tab === value ? "page" : undefined}
@@ -994,7 +1011,7 @@ function App() {
                           data={data}
                           select={(month) => {
                             setSelection({ tab: "month", value: month });
-                            setFilter("all");
+                            changeFilter("all");
                             setTab("activity");
                           }}
                         />
@@ -1016,7 +1033,9 @@ function App() {
                                 <button
                                   className="breakdown-row"
                                   key={`${b.kind}:${b.category}`}
-                                  onClick={() => drill(b.kind as EventKind)}
+                                  onClick={() =>
+                                    drill(b.kind as EventKind, b.category)
+                                  }
                                 >
                                   <span>{b.category}</span>
                                   <strong>{money(b.amountCents)}</strong>
@@ -1043,7 +1062,8 @@ function App() {
                         records={data.records}
                         accounts={data.accounts}
                         filter={filter}
-                        setFilter={setFilter}
+                        category={category}
+                        setFilter={changeFilter}
                         open={(e) => void open(e)}
                         compact
                         viewAll={() => drill(filter)}
@@ -1070,7 +1090,8 @@ function App() {
                   records={data.records}
                   accounts={data.accounts}
                   filter={filter}
-                  setFilter={setFilter}
+                  category={category}
+                  setFilter={changeFilter}
                   open={(e) => void open(e)}
                 />
               )}
