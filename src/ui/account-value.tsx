@@ -58,7 +58,7 @@ export function AccountValue({
   const first = history[0],
     last = history.at(-1);
   const change =
-    data.change?.changeCents ??
+    (net ? data.change?.changeCents : null) ??
     (first &&
     last &&
     value(first) !== null &&
@@ -192,7 +192,7 @@ export function AccountValue({
                     {change > 0 ? "+" : ""}
                     {money(change)}
                   </strong>{" "}
-                  {data.change?.changeCents !== null && data.change
+                  {net && data.change?.changeCents !== null && data.change
                     ? "change over compared dates"
                     : `across ${history.length} saved days`}
                 </>
@@ -334,7 +334,7 @@ export function AccountValue({
               ) : null}
             </>
           )}
-          <ValueChangeBreakdown data={data.change ?? null} />
+          <ValueChangeBreakdown data={net ? (data.change ?? null) : null} />
           <p className="balance-method">
             {net ? "Net worth" : "Account value"} for these two accounts only.
             {net ? " Brokerage values include borrowing." : ""} Changes include

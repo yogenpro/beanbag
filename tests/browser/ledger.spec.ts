@@ -611,6 +611,7 @@ test("value change separates net income from estimated investment loss and expla
     },
   ];
   let missingHistory = false;
+  let missingBorrowing = false;
   await page.route("**/api/report*", (route) => {
     const url = new URL(route.request().url()),
       period = {
@@ -640,11 +641,21 @@ test("value change separates net income from estimated investment loss and expla
         availablePeriod: { start: "2026-01-01", end: "2026-11-12" },
         balances: {
           ...fixture.balances,
-          latest: points.at(-1),
+          latest: missingBorrowing
+            ? {
+                ...fixture.balances.latest,
+                netWorthCents: null,
+                marginLoanCents: null,
+              }
+            : points.at(-1),
           stale: false,
-          history: points.filter(
-            (p) => p.date >= period.start && p.date <= period.end,
-          ),
+          history: points
+            .map((p) =>
+              missingBorrowing
+                ? { ...p, assetsCents: p.netWorthCents! + 20000 }
+                : p,
+            )
+            .filter((p) => p.date >= period.start && p.date <= period.end),
           change: accountValueChange(
             points,
             events,
@@ -679,11 +690,9 @@ test("value change separates net income from estimated investment loss and expla
   ).toBeVisible();
   await expect(group.getByText(/Oct 11, 2026 to/)).toBeVisible();
   await expect(page.locator(".balance-total")).toHaveText("$10,500.00");
-  await page
-    .locator(".account-value")
-    .screenshot({
-      path: `test-results/value-change-${test.info().project.name}.png`,
-    });
+  await page.locator(".account-value").screenshot({
+    path: `test-results/value-change-${test.info().project.name}.png`,
+  });
   await page.getByRole("tab", { name: "Year to date", exact: true }).click();
   await expect(
     group.getByText(/covers part of the selected period/),
@@ -701,6 +710,22 @@ test("value change separates net income from estimated investment loss and expla
   await expect(
     group.getByText(/Transaction history for both accounts is needed/),
   ).toBeVisible();
+  missingHistory = false;
+  missingBorrowing = true;
+  await page.reload();
+  await expect(
+    page.getByRole("region", { name: "Tracked account value", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Showing account value before borrowing/),
+  ).toBeVisible();
+  await expect(group).toHaveCount(0);
+  await expect(page.locator(".balance-history-heading")).not.toContainText(
+    "change over compared dates",
+  );
+  await expect(page.locator(".balance-history-heading")).toContainText(
+    "+$484.37",
+  );
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);
   expect(
