@@ -8,6 +8,13 @@ The public repository contains portable code and invented test/demo records.
 Deployment identities, household account selection, credentials, financial data,
 and infrastructure policies stay private. There is no ChatGPT runtime dependency.
 
+The dashboard is **strictly read-only**: Overview, Activity, and Data health.
+Charts, filters and record details let you inspect saved information. Unclassified
+entries remain excluded from income/spending with an explanatory note; there is
+no review queue, editing form, receipt entry, connection control or sync action.
+Dashboard APIs accept only GET/HEAD. “Refresh view” reloads saved data; provider
+ingestion runs separately through operator tooling or the authenticated worker.
+
 Resume implementation from [next steps](docs/next-steps.md), which records the
 verified baseline and the remaining live-data and deployment work.
 
@@ -21,8 +28,8 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:8787`. All figures are explicitly **Illustrative**.
-The local demo uses an in-memory repository; changes survive page reloads but
-reset when the Worker restarts. `npm run dev:ui` gives Vite hot reload while
+The local demo uses an in-memory repository that resets when the Worker restarts.
+Viewing and filtering never change its records. `npm run dev:ui` gives Vite hot reload while
 the Worker is running. `npm run db:local` applies the migration to a separate
 local D1 database; demo mode deliberately does not read it.
 
@@ -40,6 +47,12 @@ the real Sandbox API, provider-created transactions and SQLite persistence.
 Run `npm run test:sandbox` after saving separate private Sandbox credentials.
 The normal checks remain credential-free; test code and synthetic scenarios can
 be published without publishing any API secret.
+
+For the real-data feasibility spike, use the separate [private local integration
+tool](docs/local-integration.md): `npm run local -- check-config`, then `connect`,
+`complete-link`, `sync` and `report`. It uses owner-operated Hosted Link consent,
+private SQLite storage outside Git and a separately stored encryption key.
+It does not connect the illustrative dashboard or change production Access policy.
 
 ## Reporting convention
 
@@ -64,6 +77,23 @@ posting dates remain unchanged; date presets use America/Los_Angeles.
 Every total has a source drilldown. Review decisions include rationale, reviewer,
 timestamp and source revision. A provider correction preserves the decision and
 raises a review conflict. Sources and classification remain separate.
+
+## Tracked account value
+
+Overview also shows the latest reported checking and brokerage balances and a
+chart of saved daily observations. Tracked net worth is their combined current
+value less reported brokerage borrowing; it covers only these two accounts.
+Brokerage cash is already included in its account value. Holdings and stock
+receipt income are never added on top of the balance.
+
+Missing USD balances or borrowing remain unknown. A dated owner confirmation of
+no borrowing can complete one local snapshot; it is not reused for future ones.
+Collection time and institution update time are distinct. Balance data comes
+from existing Plaid products and can be cached; no real-time quote is promised.
+History starts with saved observations, with the latest observation per Pacific
+day displayed. Past values are never inferred from transaction history. Changes
+include market moves and external flows, not just investment returns. Stock
+receipt income remains fixed at its reviewed historical value.
 
 ## Status and the real-data feasibility gate
 
@@ -95,7 +125,7 @@ domain, database ID, Access audience, household identity or account mask.
 - Worker name, `DB` D1 binding, `ASSETS`, and the checked-in migration directory.
 - `assets.run_worker_first: true`, disabled `workers_dev` and `preview_urls`.
 - Custom domain behind an Access gate, covering pages and API routes.
-- Two approved individual identities and an administrator subset.
+- Two approved individual identities, both with read-only dashboard access.
 - A periodic `scheduled` trigger, plus an exact, separately secured webhook URL.
 - The private settings and Worker secrets described in the setup guide.
 

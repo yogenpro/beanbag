@@ -3,6 +3,7 @@ import type { Env } from "./api/env";
 import { D1Ledger } from "./data/d1";
 import { decryptToken } from "./providers/plaid/secrets";
 import { SyncService } from "./providers/plaid/sync";
+import { collectBalances } from "./providers/plaid/balances";
 
 export async function runSync(env: Env, scheduled = false): Promise<void> {
   if (!env.DB || !env.TOKEN_ENCRYPTION_KEY || env.LOCAL_DEMO === "true") return;
@@ -29,6 +30,13 @@ export async function runSync(env: Env, scheduled = false): Promise<void> {
       else if (product === "investments") await sync.investments();
     } catch {
       /* Sync service records a safe code in data health. Never log financial payloads. */
+    }
+  }
+  if (products.length) {
+    try {
+      await collectBalances(plaid(env), new D1Ledger(env.DB), token);
+    } catch {
+      /* Balance failures have independent health and never undo transaction syncs. */
     }
   }
 }

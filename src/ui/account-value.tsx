@@ -1,0 +1,368 @@
+import { useId, useState } from "react";
+import type { BalancePoint, BalanceReport } from "../accounting/balances";
+import type { Account } from "../accounting/types";
+import { displayDate, money } from "./api";
+
+const timestamp = (value: string) =>
+  new Date(value).toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }) + " PT";
+const amount = (value: number | null) =>
+  value === null ? "Unavailable" : money(value);
+
+export function AccountValue({
+  data,
+  accounts,
+  interactive = true,
+}: {
+  data: BalanceReport;
+  accounts: Account[];
+  interactive?: boolean;
+}) {
+  const { latest, history } = data;
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const labelId = useId();
+  const net =
+    !latest || (latest.marginLoanCents !== null && !latest.borrowingConflict);
+  const value = (point: BalancePoint) =>
+    net ? point.netWorthCents : point.assetsCents;
+  const index = Math.min(
+    selectedIndex ?? history.length - 1,
+    history.length - 1,
+  );
+  const selected = history[index];
+  const first = history[0],
+    last = history.at(-1);
+  const change =
+    first &&
+    last &&
+    value(first) !== null &&
+    value(last) !== null &&
+    history.length > 1
+      ? value(last)! - value(first)!
+      : null;
+  const available = history.filter((p) => value(p) !== null);
+  const low = Math.min(...available.map((p) => value(p)!));
+  const high = Math.max(...available.map((p) => value(p)!));
+  const spread = Math.max(high - low, Math.abs(high) * 0.02, 100);
+  const floor = low - spread * 0.15,
+    ceiling = high + spread * 0.15;
+  const x = (point: BalancePoint) =>
+    history.length === 1
+      ? 50
+      : 4 +
+        (92 * (Date.parse(point.date) - Date.parse(first.date))) /
+          Math.max(86_400_000, Date.parse(last!.date) - Date.parse(first.date));
+  const y = (point: BalancePoint) =>
+    92 - (84 * (value(point)! - floor)) / (ceiling - floor);
+  let path = "";
+  history.forEach((point, i) => {
+    if (value(point) === null) return;
+    const previous = history[i - 1];
+    const connected =
+      previous &&
+      value(previous) !== null &&
+      Date.parse(point.date) - Date.parse(previous.date) <= 86_400_000;
+    path += `${connected ? "L" : "M"}${x(point)},${y(point)} `;
+  });
+  return (
+    <section className="account-value" aria-labelledby={labelId}>
+      <div className="section-heading">
+        <h2 id={labelId}>
+          {net ? "Tracked net worth" : "Tracked account value"}
+        </h2>
+        <span className="account-scope">Checking + brokerage</span>
+      </div>
+      {!latest ? (
+        <div className="balance-empty">
+          <h3>No balance snapshots yet</h3>
+          <p>
+            History starts when the first account balances are collected. Data
+            health shows the latest collection status.
+          </p>
+        </div>
+      ) : (
+        <div className="balance-summary">
+          <div>
+            <strong className="balance-total">{amount(value(latest))}</strong>
+            <p className="balance-collected">
+              Latest snapshot · {timestamp(latest.capturedAt)}
+            </p>
+            <p className="help">
+              Latest recorded value, regardless of the reporting period.
+            </p>
+          </div>
+          <dl className="balance-breakdown">
+            {accounts.map((account) => {
+              const balance = latest.accounts.find(
+                (b) => b.accountId === account.id,
+              );
+              return (
+                <div key={account.id}>
+                  <dt>
+                    <i
+                      className={
+                        account.role === "joint_checking"
+                          ? "cash-dot"
+                          : "stock-dot"
+                      }
+                    />
+                    {account.role === "joint_checking"
+                      ? "Checking"
+                      : "Brokerage · cash & holdings"}
+                  </dt>
+                  <dd>{amount(balance?.currentCents ?? null)}</dd>
+                </div>
+              );
+            })}
+            <div>
+              <dt>Brokerage borrowing</dt>
+              <dd>{amount(latest.marginLoanCents)}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+      {!net && (
+        <p className="balance-warning">
+          {latest?.borrowingConflict
+            ? "Reported brokerage borrowing conflicts with the owner’s confirmation, so net worth is not shown."
+            : "Borrowing wasn’t reported. This is account value before any brokerage loan; net worth is unavailable."}
+        </p>
+      )}
+      {data.stale && (
+        <p className="balance-warning">
+          These balances are over 36 hours old. Data health shows the latest
+          collection status.
+        </p>
+      )}
+      {data.health.error && (
+        <p className="balance-warning" role="status">
+          The last balance refresh failed ({data.health.error}). Previous
+          snapshots are preserved. Data health shows the collection status.
+        </p>
+      )}
+      {latest && (
+        <>
+          <div className="balance-history-heading">
+            <h3>Balance history</h3>
+            <p>
+              {change !== null ? (
+                <>
+                  <strong>
+                    {change > 0 ? "+" : ""}
+                    {money(change)}
+                  </strong>{" "}
+                  across {history.length} saved days
+                </>
+              ) : (
+                "Selected reporting period"
+              )}
+            </p>
+          </div>
+          {history.length === 0 ? (
+            <div className="balance-empty">
+              <p>
+                No snapshots in this period. Choose a period with saved
+                balances.
+              </p>
+            </div>
+          ) : available.length === 0 ? (
+            <div className="balance-empty">
+              <p>
+                Both USD account balances{net ? " and brokerage borrowing" : ""}{" "}
+                are needed to plot a total. Missing values are not treated as
+                zero.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="balance-plot">
+                <div className="balance-scale" aria-hidden="true">
+                  <span>{money(Math.round(ceiling))}</span>
+                  <span>{money(Math.round(floor))}</span>
+                </div>
+                <svg
+                  className="balance-chart"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  role="img"
+                  aria-label={`${net ? "Tracked net worth" : "Account value"} history: ${available.length} recorded daily snapshots. Use ${interactive ? "the snapshot selector or " : ""}the table for exact values.`}
+                  onClick={(event) => {
+                    if (!interactive) return;
+                    const box = event.currentTarget.getBoundingClientRect();
+                    const position =
+                      ((event.clientX - box.left) / box.width) * 100;
+                    const closest = history.reduce(
+                      (best, point, i) =>
+                        Math.abs(x(point) - position) <
+                        Math.abs(x(history[best]) - position)
+                          ? i
+                          : best,
+                      0,
+                    );
+                    setSelectedIndex(closest);
+                  }}
+                >
+                  {[8, 50, 92].map((level) => (
+                    <line
+                      key={level}
+                      x1="0"
+                      x2="100"
+                      y1={level}
+                      y2={level}
+                      className="balance-gridline"
+                    />
+                  ))}
+                  <path d={path} className="balance-line" />
+                  {available.map((point, i) => {
+                    const adjacent = [available[i - 1], available[i + 1]].some(
+                      (other) =>
+                        other &&
+                        Math.abs(
+                          Date.parse(other.date) - Date.parse(point.date),
+                        ) === 86_400_000,
+                    );
+                    // A round, non-scaling stroke stays circular in this responsive SVG.
+                    return (
+                      <line
+                        key={point.capturedAt}
+                        x1={x(point)}
+                        x2={x(point)}
+                        y1={y(point)}
+                        y2={y(point)}
+                        className={`balance-dot${adjacent ? "" : " isolated"}`}
+                      />
+                    );
+                  })}
+                  {selected && value(selected) !== null && (
+                    <line
+                      x1={x(selected)}
+                      x2={x(selected)}
+                      y1="0"
+                      y2="100"
+                      className="balance-cursor"
+                    />
+                  )}
+                  {selected && value(selected) !== null && (
+                    <line
+                      x1={x(selected)}
+                      x2={x(selected)}
+                      y1={y(selected)}
+                      y2={y(selected)}
+                      className="balance-dot isolated"
+                    />
+                  )}
+                </svg>
+              </div>
+              <div className="balance-dates">
+                <span>{displayDate(first.date)}</span>
+                {history.length > 1 && <span>{displayDate(last!.date)}</span>}
+              </div>
+              <div className="balance-selection" aria-live="polite">
+                <span>
+                  {selected ? displayDate(selected.date) : "Choose a snapshot"}
+                </span>
+                <strong>{selected ? amount(value(selected)) : ""}</strong>
+              </div>
+              {history.length > 1 && interactive ? (
+                <label className="balance-slider-label">
+                  Inspect a snapshot
+                  <input
+                    type="range"
+                    min="0"
+                    max={history.length - 1}
+                    step="1"
+                    value={index}
+                    aria-label="Snapshot date"
+                    aria-valuetext={
+                      selected
+                        ? `${displayDate(selected.date)}, ${amount(value(selected))}`
+                        : ""
+                    }
+                    onChange={(e) => setSelectedIndex(Number(e.target.value))}
+                  />
+                </label>
+              ) : history.length === 1 ? (
+                <p className="help">
+                  First snapshot saved. Another day’s snapshot will start the
+                  trend.
+                </p>
+              ) : null}
+            </>
+          )}
+          <p className="balance-method">
+            {net ? "Net worth" : "Account value"} for these two accounts only.
+            Changes include market movements and money entering or leaving; they
+            are not investment returns. Gaps have no recorded balance.
+          </p>
+          <details className="balance-details">
+            <summary>Snapshots & freshness</summary>
+            <p className="help">
+              Collected from {latest.provider}. Collection time is when Beanbag
+              received the data; institution balances may be older.
+              Stock-receipt income keeps its original historical value.
+            </p>
+            {latest.borrowingConfirmation && (
+              <p className="help">
+                No brokerage borrowing was confirmed by the owner for this
+                snapshot on{" "}
+                {timestamp(latest.borrowingConfirmation.confirmedAt)}.
+              </p>
+            )}
+            <dl className="balance-source-times">
+              {accounts.map((account) => {
+                const balance = latest.accounts.find(
+                  (b) => b.accountId === account.id,
+                );
+                return (
+                  <div key={account.id}>
+                    <dt>
+                      {account.role === "joint_checking"
+                        ? "Checking"
+                        : "Brokerage"}{" "}
+                      updated by institution
+                    </dt>
+                    <dd>
+                      {balance?.institutionUpdatedAt
+                        ? timestamp(balance.institutionUpdatedAt)
+                        : "Not supplied"}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+            {history.length > 0 && (
+              <div className="balance-table-wrap">
+                <table>
+                  <caption>
+                    Saved daily snapshots in the reporting period
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Date (PT)</th>
+                      <th scope="col">Account value</th>
+                      <th scope="col">Borrowing</th>
+                      <th scope="col">Net worth</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...history].reverse().map((point) => (
+                      <tr key={point.capturedAt}>
+                        <th scope="row">{displayDate(point.date)}</th>
+                        <td>{amount(point.assetsCents)}</td>
+                        <td>{amount(point.marginLoanCents)}</td>
+                        <td>{amount(point.netWorthCents)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </details>
+        </>
+      )}
+    </section>
+  );
+}

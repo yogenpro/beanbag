@@ -1,26 +1,26 @@
 import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ArrowDownLeft,
+  Activity,
   ArrowUpRight,
   ArrowLeftRight,
   ArrowRight,
-  Check,
   CheckCheck,
   ChevronRight,
-  CircleHelp,
-  Clock3,
+  CalendarDays,
+  CircleAlert,
   Leaf,
+  LayoutDashboard,
   LockKeyhole,
-  Plus,
   RefreshCw,
+  Rows3,
   ShieldCheck,
   X,
 } from "lucide-react";
 import { periodFor, type Period } from "../accounting/dates";
-import type { EventKind, FinancialEvent, Valuation } from "../accounting/types";
+import type { EventKind, FinancialEvent } from "../accounting/types";
 import { api, money, displayDate, type Dashboard, type Detail } from "./api";
-import { openPlaidLink } from "./link";
+import { AccountValue } from "./account-value";
 import "./style.css";
 
 const kindNames: Record<EventKind, string> = {
@@ -29,7 +29,7 @@ const kindNames: Record<EventKind, string> = {
   spending: "Checking spending",
   internal_transfer: "Internal transfer",
   ignored: "Excluded activity",
-  unknown: "Needs review",
+  unknown: "Unclassified",
 };
 type Filter =
   | EventKind
@@ -38,8 +38,8 @@ type Filter =
   | "net_cash"
   | "net_recorded"
   | "pending"
-  | "review";
-type Tab = "overview" | "activity" | "review" | "health";
+  | "unclassified";
+type Tab = "overview" | "activity" | "health";
 function Button({
   children,
   onClick,
@@ -137,6 +137,7 @@ function Records({
   setFilter,
   open,
   compact = false,
+  viewAll,
 }: {
   records: FinancialEvent[];
   accounts: Dashboard["accounts"];
@@ -144,10 +145,11 @@ function Records({
   setFilter: (v: Filter) => void;
   open: (e: FinancialEvent) => void;
   compact?: boolean;
+  viewAll?: () => void;
 }) {
   const items = records
     .filter((e) => {
-      if (filter === "review") return e.status === "needs_review";
+      if (filter === "unclassified") return e.status === "needs_review";
       if (filter === "pending") return e.status === "pending";
       if (filter === "all") return true;
       if (e.status !== "confirmed") return false;
@@ -164,9 +166,12 @@ function Records({
     <section className="panel records" id="records">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">THE LEDGER</p>
           <h2>
-            {filter === "review" ? "Needs review" : "Account activity"}{" "}
+            {filter === "unclassified"
+              ? "Unclassified entries"
+              : compact
+                ? "Recent activity"
+                : "Records"}{" "}
             <span className="count">{items.length}</span>
           </h2>
         </div>
@@ -184,8 +189,8 @@ function Records({
             <option value="net_cash">Net cash flow</option>
             <option value="net_recorded">Net recorded inflow</option>
             <option value="internal_transfer">Internal transfers</option>
-            <option value="review">Needs review</option>
-            <option value="pending">Pending preview</option>
+            <option value="unclassified">Unclassified entries</option>
+            <option value="pending">Pending</option>
             <option value="ignored">Excluded investment activity</option>
           </select>
         </label>
@@ -194,8 +199,8 @@ function Records({
         <div className="empty">
           <CheckCheck size={28} />
           <h3>
-            {filter === "review"
-              ? "Nothing to review in this period"
+            {filter === "unclassified"
+              ? "No unclassified entries in this period"
               : "No matching records"}
           </h3>
           <p>Choose another date range or activity filter.</p>
@@ -207,7 +212,7 @@ function Records({
               <tr>
                 <th>Date / account</th>
                 <th>Description</th>
-                <th>Decision</th>
+                <th>Status</th>
                 <th className="right">Amount</th>
                 <th>
                   <span className="sr-only">Open record</span>
@@ -215,7 +220,7 @@ function Records({
               </tr>
             </thead>
             <tbody>
-              {items.slice(0, compact ? 8 : undefined).map((e) => (
+              {items.slice(0, compact ? 5 : undefined).map((e) => (
                 <tr key={e.id}>
                   <td>
                     <span>{displayDate(e.date)}</span>
@@ -237,10 +242,10 @@ function Records({
                   </td>
                   <td>
                     <span
-                      className={`status ${e.status === "needs_review" ? "review" : e.status === "pending" ? "pending" : e.kind === "internal_transfer" ? "internal" : e.kind === "stock_income" ? "stock" : ""}`}
+                      className={`status ${e.status === "needs_review" ? "review" : e.status === "pending" ? "pending" : e.kind === "internal_transfer" || e.kind === "ignored" ? "internal" : e.kind === "stock_income" ? "stock" : e.kind === "spending" ? "outflow" : ""}`}
                     >
                       {e.status === "needs_review"
-                        ? "Needs review"
+                        ? "Unclassified"
                         : e.status === "pending"
                           ? "Pending"
                           : kindNames[e.kind]}
@@ -278,14 +283,8 @@ function Records({
           </table>
         </div>
       )}
-      {compact && items.length > 8 && (
-        <button
-          className="text-button table-footer"
-          onClick={() => {
-            setFilter(filter);
-            document.getElementById("activity-tab")?.click();
-          }}
-        >
+      {compact && items.length > 5 && (
+        <button className="text-button table-footer" onClick={viewAll}>
           View all {items.length} records <ArrowRight size={15} />
         </button>
       )}
@@ -308,7 +307,6 @@ function Trend({
     <section className="panel trend">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">THE BIGGER PICTURE</p>
           <h2>Income & spending</h2>
         </div>
         <span className="subtle">
@@ -339,7 +337,7 @@ function Trend({
           role="group"
           aria-label="Monthly income and checking spending. Select a month to view its records."
         >
-          <div className="chart-guides">
+          <div className="chart-guides" aria-hidden="true">
             <span>{money(max)}</span>
             <span>{money(Math.round(max / 2))}</span>
             <span>$0</span>
@@ -347,10 +345,11 @@ function Trend({
           <div className="bars">
             {months.map((m) => (
               <button
-                className="month-bar"
+                className={`month-bar ${data.period.start.startsWith(m.month) && data.period.end.startsWith(m.month) ? "selected" : ""}`}
                 key={m.month}
                 onClick={() => select(m.month)}
                 aria-label={`${m.month}: checking income ${money(m.cashIncome)}, stock transfers ${money(m.stockIncome)}, checking spending ${money(m.spending)}`}
+                title={`${m.month}: checking ${money(m.cashIncome)} · stock ${money(m.stockIncome)} · spending ${money(m.spending)}`}
               >
                 <span className="bar-pair">
                   <span className="income-bar">
@@ -386,73 +385,14 @@ function Trend({
     </section>
   );
 }
-function ReviewRecord({
+function RecordDetail({
   detail,
   close,
-  saved,
 }: {
   detail: Detail;
   close: () => void;
-  saved: () => void;
 }) {
   const { event, source } = detail;
-  const [kind, setKind] = useState<EventKind>(
-    event.kind === "unknown"
-      ? source.kind === "bank"
-        ? "internal_transfer"
-        : "stock_income"
-      : event.kind,
-  );
-  const [rationale, setRationale] = useState(""),
-    [postingDate, setPostingDate] = useState(event.date);
-  const [price, setPrice] = useState(event.valuation?.close ?? ""),
-    [priceDate, setPriceDate] = useState(
-      event.valuation?.priceDate ?? source.date,
-    ),
-    [provider, setProvider] = useState(event.valuation?.provider ?? "");
-  const [preview, setPreview] = useState<{
-      before: FinancialEvent;
-      after: FinancialEvent;
-    } | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const payload = () => ({
-    eventId: event.id,
-    baseRevision: event.revision,
-    kind,
-    date: postingDate,
-    rationale,
-    ...(kind === "stock_income" && source.kind === "investment"
-      ? {
-          valuation: {
-            securityId: source.securityId ?? "",
-            quantity: source.quantity ?? "",
-            eventDate: postingDate,
-            close: price,
-            priceDate,
-            provider,
-            currency: "USD",
-            retrievedAt: new Date().toISOString(),
-            convention: "last_session_close",
-          } satisfies Valuation,
-        }
-      : {}),
-  });
-  const changed = () => setPreview(null);
-  async function submit(save: boolean) {
-    setBusy(true);
-    setError("");
-    try {
-      if (save) {
-        await api("/api/overrides", payload());
-        saved();
-      } else setPreview(await api("/api/review/preview", payload()));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <Modal title={event.description} close={close}>
       <div className="dialog-body">
@@ -461,14 +401,27 @@ function ReviewRecord({
             className={`status ${event.status === "needs_review" ? "review" : ""}`}
           >
             {event.status === "needs_review"
-              ? "Needs review"
-              : kindNames[event.kind]}
+              ? "Unclassified"
+              : event.status === "pending"
+                ? "Pending"
+                : kindNames[event.kind]}
           </span>
           <strong>
             {event.amountCents === null ? "Unvalued" : money(event.amountCents)}
           </strong>
         </div>
         <p className="decision-reason">{event.reason}</p>
+        {event.status === "needs_review" && (
+          <p className="callout">
+            This entry is excluded from income and spending because its
+            classification or valuation is incomplete.
+          </p>
+        )}
+        {event.status === "pending" && (
+          <p className="callout">
+            Pending transactions are excluded from confirmed totals.
+          </p>
+        )}
         <dl className="detail-grid">
           <div>
             <dt>Posted date</dt>
@@ -505,175 +458,27 @@ function ReviewRecord({
             <strong>Historical valuation</strong>
             <p>
               {event.valuation.quantity} shares × ${event.valuation.close} ·{" "}
-              {event.valuation.priceDate}
+              {displayDate(event.valuation.priceDate)}
             </p>
             <small>
               {event.valuation.provider}. Original valuation retained.
             </small>
           </div>
         )}
-        {event.status === "pending" ? (
-          <p className="callout">
-            Pending records stay outside confirmed totals. Review after the
-            transaction posts.
-          </p>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void submit(false);
-            }}
-            onChange={changed}
-          >
-            <h3>Review this decision</h3>
-            <div className="form-grid">
-              <label>
-                Classification
-                <select
-                  value={kind}
-                  onChange={(e) => setKind(e.target.value as EventKind)}
-                >
-                  {(source.kind === "bank"
-                    ? [
-                        "cash_income",
-                        "spending",
-                        "internal_transfer",
-                        "ignored",
-                        "unknown",
-                      ]
-                    : source.activity === "transfer"
-                      ? ["stock_income", "ignored", "unknown"]
-                      : ["ignored", "unknown"]
-                  ).map((k) => (
-                    <option key={k} value={k}>
-                      {kindNames[k as EventKind]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Correct posting date
-                <input
-                  required
-                  type="date"
-                  value={postingDate}
-                  onChange={(e) => setPostingDate(e.target.value)}
-                />
-              </label>
-            </div>
-            {kind === "stock_income" && (
-              <>
-                <p className="help">
-                  Confirm an external security receipt using institution
-                  evidence. Use the USD closing price on arrival, or the last
-                  prior trading session.
-                </p>
-                <div className="form-grid">
-                  <label>
-                    Historical close (USD)
-                    <input
-                      required
-                      inputMode="decimal"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="184.32"
-                    />
-                  </label>
-                  <label>
-                    Price session date
-                    <input
-                      required
-                      type="date"
-                      value={priceDate}
-                      max={postingDate}
-                      onChange={(e) => setPriceDate(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <label>
-                  Historical price source
-                  <input
-                    required
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
-                    placeholder="Provider / statement reference"
-                  />
-                </label>
-              </>
-            )}
-            <label>
-              Decision rationale
-              <textarea
-                required
-                minLength={5}
-                maxLength={1000}
-                value={rationale}
-                onChange={(e) => setRationale(e.target.value)}
-                placeholder="What evidence supports this decision?"
-              />
-            </label>
-            {preview && (
-              <div
-                className={`preview ${preview.after.status === "needs_review" ? "callout" : ""}`}
-              >
-                <strong>Effect on this record</strong>
-                <p>
-                  {kindNames[preview.before.kind]} (
-                  {preview.before.status === "confirmed"
-                    ? money(preview.before.amountCents ?? 0)
-                    : "excluded"}
-                  ) <ArrowRight size={14} /> {kindNames[preview.after.kind]} (
-                  {preview.after.status === "confirmed"
-                    ? money(preview.after.amountCents ?? 0)
-                    : "excluded"}
-                  )
-                </p>
-                <small>{preview.after.reason}</small>
-              </div>
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="dialog-actions">
-              <Button
-                type="submit"
-                disabled={busy || rationale.trim().length < 5}
-              >
-                Preview change
-              </Button>
-              <Button
-                className="primary"
-                onClick={() => void submit(true)}
-                disabled={
-                  busy ||
-                  !preview ||
-                  (preview.after.status !== "confirmed" && kind !== "unknown")
-                }
-              >
-                <Check size={16} />
-                Save decision
-              </Button>
-            </div>
-          </form>
-        )}
         <details>
-          <summary>Source & decision history</summary>
+          <summary>Source & classification history</summary>
           <pre>{JSON.stringify(source, null, 2)}</pre>
           {detail.history.length ? (
             detail.history.map((o) => (
               <div className="audit-entry" key={o.id}>
                 <strong>{kindNames[o.kind]}</strong>
                 <p>{o.rationale}</p>
-                <small>
-                  {o.createdAt} · Reviewer: {o.actor}
-                </small>
+                <small>{o.createdAt}</small>
               </div>
             ))
           ) : (
             <p className="help">
-              No manual decisions. Classified by {event.ruleVersion}.
+              Classified from the source record. No recorded adjustments.
             </p>
           )}
         </details>
@@ -681,150 +486,20 @@ function ReviewRecord({
     </Modal>
   );
 }
-function AddReceipt({
-  close,
-  saved,
-}: {
-  close: () => void;
-  saved: () => void;
-}) {
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <Modal title="Record an incoming share transfer" close={close}>
-      <form
-        className="dialog-body"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const values = Object.fromEntries(new FormData(e.currentTarget));
-          if (!values.providerTransactionId)
-            delete values.providerTransactionId;
-          setBusy(true);
-          setError("");
-          try {
-            await api("/api/receipts", values);
-            saved();
-          } catch (error) {
-            setError((error as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <p className="help">
-          Use a verified external receipt into the selected brokerage. This
-          records household in-kind income at its historical arrival value.
-        </p>
-        <div className="form-grid">
-          <label>
-            Unique receipt reference
-            <input
-              name="reference"
-              required
-              minLength={3}
-              placeholder="receipt-001"
-            />
-          </label>
-          <label>
-            Arrival date
-            <input name="date" type="date" required />
-          </label>
-          <label>
-            Security identifier
-            <input
-              name="securityId"
-              required
-              placeholder="Stable provider security ID"
-            />
-          </label>
-          <label>
-            Ticker
-            <input name="ticker" required placeholder="EXM" />
-          </label>
-          <label>
-            Exact share quantity
-            <input
-              name="quantity"
-              required
-              inputMode="decimal"
-              placeholder="42.5"
-            />
-          </label>
-          <label>
-            Historical close (USD)
-            <input
-              name="close"
-              required
-              inputMode="decimal"
-              placeholder="184.32"
-            />
-          </label>
-          <label>
-            Price session date
-            <input name="priceDate" type="date" required />
-          </label>
-          <label>
-            Historical price source
-            <input
-              name="priceSource"
-              required
-              minLength={3}
-              placeholder="Historical quote / statement"
-            />
-          </label>
-        </div>
-        <label>
-          Plaid transaction ID, if known
-          <input
-            name="providerTransactionId"
-            placeholder="Prevents a second event on later sync"
-          />
-        </label>
-        <label>
-          Receipt evidence & rationale
-          <textarea
-            name="rationale"
-            required
-            minLength={10}
-            placeholder="Reference the institution receipt, external origin, quantity, and closing price evidence."
-          />
-        </label>
-        <p className="help">
-          If a matching provider transfer already exists, review that record
-          instead. Do not enter the same receipt twice.
-        </p>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        <div className="dialog-actions">
-          <Button onClick={close}>Cancel</Button>
-          <Button className="primary" type="submit" disabled={busy}>
-            Record verified receipt
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 function Health({
   data,
-  connect,
-  syncing,
-  sync,
+  refresh,
+  loading,
 }: {
   data: Dashboard;
-  connect: () => void;
-  syncing: boolean;
-  sync: () => void;
+  refresh: () => void;
+  loading: boolean;
 }) {
   return (
     <section className="panel health" id="health">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">KNOW WHAT IS INCLUDED</p>
-          <h2>Data health</h2>
+          <h2>Connection & coverage</h2>
         </div>
         <ShieldCheck size={21} />
       </div>
@@ -836,9 +511,9 @@ function Health({
             ? "Illustrative · no bank connected"
             : data.connectionStatus.replaceAll("_", " ")}
         </span>
-        <Button onClick={sync} disabled={syncing}>
+        <Button onClick={refresh} disabled={loading}>
           <RefreshCw size={15} />
-          Request sync
+          Refresh view
         </Button>
       </div>
       <div className="health-grid">
@@ -893,20 +568,29 @@ function Health({
           </article>
         ))}
       </div>
-      {data.actor.admin && !data.illustrative && (
-        <div className="health-footer">
-          <Button className="primary" onClick={connect}>
-            <LockKeyhole size={15} />
-            {data.connectionStatus === "not_connected"
-              ? "Connect selected accounts"
-              : "Repair Plaid connection"}
-          </Button>
-          <p className="help">
-            Independent Plaid authorization. Only the two privately configured
-            accounts are ingested.
+      <div className="balance-sync-health">
+        <h3>Account balances</h3>
+        <p className="help">
+          Last collected:{" "}
+          {data.balances.health.lastSuccess
+            ? new Date(data.balances.health.lastSuccess).toLocaleString(
+                "en-US",
+                {
+                  timeZone: "America/Los_Angeles",
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                },
+              ) + " PT"
+            : "Not collected"}
+          . Institution values may be cached. Saved snapshots appear in
+          Overview.
+        </p>
+        {data.balances.health.error && (
+          <p className="error">
+            Balance refresh needs attention: {data.balances.health.error}
           </p>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
@@ -919,9 +603,7 @@ function App() {
     [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview"),
     [filter, setFilter] = useState<Filter>("all"),
-    [detail, setDetail] = useState<Detail | null>(null),
-    [add, setAdd] = useState(false),
-    [syncing, setSyncing] = useState(false);
+    [detail, setDetail] = useState<Detail | null>(null);
   const request = useRef(0);
   async function load() {
     const id = ++request.current;
@@ -947,20 +629,6 @@ function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [tab]);
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("oauth_state_id")) {
-      void openPlaidLink(
-        () => {
-          setNotice(
-            "Account authorization completed. Request a sync from Data health.",
-          );
-          void load();
-        },
-        setNotice,
-        true,
-      ).catch((e) => setNotice((e as Error).message));
-    }
-  }, []);
   function drill(value: Filter) {
     setFilter(value);
     setTab("activity");
@@ -972,79 +640,67 @@ function App() {
       setNotice((err as Error).message);
     }
   }
-  async function sync() {
-    setSyncing(true);
-    try {
-      const result = await api<{ illustrative?: boolean }>("/api/sync", {});
-      setNotice(
-        result.illustrative
-          ? "Illustrative mode: no financial provider is connected."
-          : "Sync requested. Data health will show when each product finishes.",
-      );
-    } catch (e) {
-      setNotice((e as Error).message);
-    } finally {
-      setSyncing(false);
-    }
-  }
-  async function connect() {
-    try {
-      await openPlaidLink(() => {
-        setNotice("Connection authorized. Request a sync to start ingestion.");
-        void load();
-      }, setNotice);
-    } catch (e) {
-      setNotice((e as Error).message);
-    }
-  }
   const totals = data?.totals;
   return (
     <>
-      <header className="app-header">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <aside className="app-sidebar">
         <a className="brand" href="/" aria-label="Beanbag home">
           <span className="brand-mark">
-            <Leaf size={22} />
+            <Leaf size={24} />
           </span>
           beanbag
-          <span className="brand-divider" />
-          <small>HOUSEHOLD LEDGER</small>
         </a>
-        <span className="private-label">
-          <LockKeyhole size={13} />
-          Private by design
-        </span>
-      </header>
-      <main>
-        <div className="workspace-bar">
-          <nav aria-label="Main navigation">
-            {(
-              [
-                ["overview", "Overview"],
-                ["activity", "Activity"],
-                ["review", "Needs review"],
-                ["health", "Data health"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                id={`${value}-tab`}
-                key={value}
-                onClick={() => {
-                  setTab(value);
-                  if (value === "review") setFilter("review");
-                  else if (value === "activity") setFilter("all");
-                }}
-                className={tab === value ? "active" : ""}
-                aria-current={tab === value ? "page" : undefined}
-              >
-                {label}
-                {value === "review" && !!data?.review.count && (
-                  <span className="nav-count">{data.review.count}</span>
-                )}
-              </button>
-            ))}
-          </nav>
-          <span className="time-zone">America/Los_Angeles</span>
+        <p className="workspace-label">Household ledger</p>
+        <nav aria-label="Main navigation">
+          {(
+            [
+              ["overview", "Overview", LayoutDashboard],
+              ["activity", "Activity", Rows3],
+              ["health", "Data health", Activity],
+            ] as const
+          ).map(([value, label, Icon]) => (
+            <button
+              id={`${value}-tab`}
+              key={value}
+              onClick={() => {
+                setTab(value);
+                if (value === "activity") setFilter("all");
+              }}
+              className={tab === value ? "active" : ""}
+              aria-current={tab === value ? "page" : undefined}
+            >
+              <Icon size={17} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-boundary">
+          <h2>Your reporting boundary</h2>
+          <div>
+            <span className="account-node" />
+            Checking
+          </div>
+          <span className="account-connector" aria-hidden="true" />
+          <div>
+            <span className="account-node brokerage" />
+            Brokerage
+          </div>
+          <p>
+            One household. Internal cash movements stay outside your totals.
+          </p>
         </div>
+        <div className="sidebar-footer">
+          <span>
+            <LockKeyhole size={14} />
+            Private by design
+          </span>
+          <span>Pacific time</span>
+        </div>
+      </aside>
+      <main id="main-content" tabIndex={-1}>
         {data?.illustrative && (
           <div className="illustration-bar">
             <span>
@@ -1052,35 +708,29 @@ function App() {
               Illustrative data
             </span>
             <p>All figures and accounts are invented. No bank is connected.</p>
-            <CircleHelp size={15} />
           </div>
         )}
         <div className="page-heading">
           <div>
-            <p className="eyebrow">TWO ACCOUNTS. ONE CLEAR PICTURE.</p>
             <h1>
               {tab === "overview"
-                ? "Your household, in view."
+                ? "Overview"
                 : tab === "activity"
-                  ? "Follow every dollar."
-                  : tab === "review"
-                    ? "A little clarity needed."
-                    : "A clear view of coverage."}
+                  ? "Account activity"
+                  : "Data health"}
             </h1>
             <p className="subtitle">
               {tab === "overview"
-                ? "What came in, what went out, and what stayed between accounts."
-                : tab === "review"
-                  ? "Unresolved records stay outside confirmed totals until you review them."
-                  : tab === "health"
-                    ? "Independent sync status, reporting gaps, and connection details."
-                    : "Every total leads back to its posted records and decision evidence."}
+                ? "Account value, income, and spending across your two accounts."
+                : tab === "health"
+                  ? "Independent sync status, reporting gaps, and connection details."
+                  : "Browse posted records and the evidence behind each total."}
             </p>
           </div>
-          <Button onClick={() => setAdd(true)} disabled={!data}>
-            <Plus size={16} />
-            Record stock receipt
-          </Button>
+          <span className="read-only-label">
+            <LockKeyhole size={14} aria-hidden="true" />
+            Read-only
+          </span>
         </div>
         <div className="period-bar">
           <div className="period-presets" aria-label="Reporting period">
@@ -1136,6 +786,7 @@ function App() {
             </div>
           ) : (
             <span className="period-label">
+              <CalendarDays size={15} aria-hidden="true" />
               {displayDate(period.start)} — {displayDate(period.end)}
             </span>
           )}
@@ -1161,56 +812,54 @@ function App() {
           </section>
         ) : loading ? (
           <div className="loading" role="status">
-            <RefreshCw size={22} />
-            <p>Opening the ledger…</p>
+            <span className="sr-only">Opening the ledger…</span>
+            <div className="skeleton-summary" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="skeleton-chart" aria-hidden="true" />
           </div>
         ) : (
           data &&
           totals && (
             <>
-              {data.review.count > 0 && tab !== "review" && (
-                <button
-                  className="review-banner"
-                  onClick={() => {
-                    setTab("review");
-                    setFilter("review");
-                  }}
-                >
-                  <span className="review-symbol">!</span>
-                  <span>
-                    <strong>
-                      {data.review.count} records need a closer look
-                    </strong>
-                    <small>
-                      {data.review.knownCents
-                        ? `${money(data.review.knownCents)} in known amounts`
-                        : "Unresolved amounts"}
-                      {data.review.unvalued
-                        ? ` · ${data.review.unvalued} unvalued`
-                        : ""}{" "}
-                      · excluded from confirmed totals for this period
-                    </small>
-                  </span>
-                  <span className="review-action">
-                    Review <ArrowRight size={16} />
-                  </span>
-                </button>
-              )}
               {tab === "overview" && (
                 <>
+                  <AccountValue
+                    key={`${period.start}:${period.end}`}
+                    data={data.balances}
+                    accounts={data.accounts}
+                  />
+                  <div className="section-heading">
+                    <h2>Confirmed totals</h2>
+                    <span
+                      className={`status ${data.review.count ? "review" : ""}`}
+                    >
+                      {data.review.count
+                        ? "Unclassified entries excluded"
+                        : "Confirmed records"}
+                    </span>
+                  </div>
+                  {data.review.count > 0 && (
+                    <div className="excluded-note">
+                      <CircleAlert size={16} aria-hidden="true" />
+                      <p>
+                        {data.review.count}{" "}
+                        {data.review.count === 1 ? "entry is" : "entries are"}{" "}
+                        excluded from income and spending because classification
+                        or valuation is incomplete.
+                      </p>
+                      <button
+                        className="text-button"
+                        onClick={() => drill("unclassified")}
+                      >
+                        View entries <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  )}
                   <div className="summary-grid">
                     <section className="income-summary">
-                      <div className="summary-top">
-                        <span className="eyebrow">
-                          <ArrowDownLeft size={15} />
-                          CONFIRMED INCOME
-                        </span>
-                        <span className="status subtle-status">
-                          {data.review.count
-                            ? "Partial · review open"
-                            : "Confirmed records"}
-                        </span>
-                      </div>
                       <button
                         className="hero-metric"
                         aria-label="View total recorded income records"
@@ -1240,12 +889,6 @@ function App() {
                       </div>
                     </section>
                     <section className="spending-summary">
-                      <div className="summary-top">
-                        <span className="eyebrow">
-                          <ArrowUpRight size={15} />
-                          CONFIRMED OUTFLOW
-                        </span>
-                      </div>
                       <button
                         className="hero-metric"
                         aria-label="View checking spending records"
@@ -1325,8 +968,7 @@ function App() {
                     <section className="panel breakdown">
                       <div className="panel-heading">
                         <div>
-                          <p className="eyebrow">WHERE IT WENT</p>
-                          <h2>Checking spending</h2>
+                          <h2>Spending breakdown</h2>
                         </div>
                       </div>
                       {data.breakdown.filter((b) => b.kind === "spending")
@@ -1369,43 +1011,37 @@ function App() {
                     setFilter={setFilter}
                     open={(e) => void open(e)}
                     compact
+                    viewAll={() => drill(filter)}
                   />
+                  <button
+                    className="coverage-link"
+                    onClick={() => setTab("health")}
+                  >
+                    <ShieldCheck size={18} />
+                    <span>
+                      <strong>Know what is included</strong>
+                      <small>
+                        View sync status and reporting gaps in Data health.
+                      </small>
+                    </span>
+                    <ArrowRight size={17} />
+                  </button>
                 </>
               )}
-              {(tab === "activity" || tab === "review") && (
-                <>
-                  {tab === "review" && (
-                    <div className="review-intro">
-                      <Clock3 size={22} />
-                      <p>
-                        <strong>{data.review.count} unresolved records</strong>
-                        <br />
-                        {data.review.knownCents
-                          ? money(data.review.knownCents) + " known"
-                          : "No known cash amount"}{" "}
-                        · {data.review.unvalued} awaiting valuation. A
-                        successful sync does not establish complete coverage.
-                      </p>
-                    </div>
-                  )}
-                  <Records
-                    records={data.records}
-                    accounts={data.accounts}
-                    filter={tab === "review" ? "review" : filter}
-                    setFilter={(value) => {
-                      setFilter(value);
-                      if (value !== "review") setTab("activity");
-                    }}
-                    open={(e) => void open(e)}
-                  />
-                </>
+              {tab === "activity" && (
+                <Records
+                  records={data.records}
+                  accounts={data.accounts}
+                  filter={filter}
+                  setFilter={setFilter}
+                  open={(e) => void open(e)}
+                />
               )}
-              {(tab === "health" || tab === "overview") && (
+              {tab === "health" && (
                 <Health
                   data={data}
-                  connect={() => void connect()}
-                  syncing={syncing}
-                  sync={() => void sync()}
+                  refresh={() => void load()}
+                  loading={loading}
                 />
               )}
             </>
@@ -1426,29 +1062,7 @@ function App() {
           </span>
         </footer>
       </main>
-      {detail && (
-        <ReviewRecord
-          detail={detail}
-          close={() => setDetail(null)}
-          saved={() => {
-            setDetail(null);
-            setNotice("Decision saved with reviewer and evidence.");
-            void load();
-          }}
-        />
-      )}
-      {add && (
-        <AddReceipt
-          close={() => setAdd(false)}
-          saved={() => {
-            setAdd(false);
-            setNotice(
-              "Verified receipt recorded once at its historical arrival value.",
-            );
-            void load();
-          }}
-        />
-      )}
+      {detail && <RecordDetail detail={detail} close={() => setDetail(null)} />}
     </>
   );
 }

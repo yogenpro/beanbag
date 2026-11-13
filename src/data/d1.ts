@@ -1,5 +1,10 @@
 import { classify } from "../accounting/classify";
 import {
+  emptyBalanceHealth,
+  type BalanceSnapshot,
+  type BalanceHealth,
+} from "../accounting/balances";
+import {
   eventId,
   type Account,
   type Coverage,
@@ -19,6 +24,58 @@ import {
 export class ConflictError extends Error {}
 export class D1Ledger implements LedgerRepository {
   constructor(readonly db: D1Database) {}
+  balanceSnapshots() {
+    return this.jsonRows<BalanceSnapshot>(
+      "SELECT snapshot_json FROM balance_snapshots ORDER BY captured_at",
+      "snapshot_json",
+    );
+  }
+  async balanceHealth(): Promise<BalanceHealth> {
+    return (
+      (
+        await this.jsonRows<BalanceHealth>(
+          "SELECT health_json FROM balance_refresh WHERE id=1",
+          "health_json",
+        )
+      )[0] ?? emptyBalanceHealth()
+    );
+  }
+  async saveBalanceSnapshot(snapshot: BalanceSnapshot) {
+    const health: BalanceHealth = {
+      lastAttempt: snapshot.capturedAt,
+      lastSuccess: snapshot.capturedAt,
+      error: null,
+    };
+    await this.db.batch([
+      this.db
+        .prepare(
+          "INSERT OR IGNORE INTO balance_snapshots(captured_at,snapshot_json) VALUES(?,?)",
+        )
+        .bind(snapshot.capturedAt, JSON.stringify(snapshot)),
+      this.db
+        .prepare(
+          `INSERT INTO balance_refresh(id,health_json) VALUES(1,?)
+        ON CONFLICT(id) DO UPDATE SET health_json=excluded.health_json
+        WHERE json_extract(excluded.health_json,'$.lastAttempt') >= json_extract(balance_refresh.health_json,'$.lastAttempt')`,
+        )
+        .bind(JSON.stringify(health)),
+    ]);
+  }
+  async failBalanceRefresh(at: string, error: string) {
+    await this.db
+      .prepare(
+        `INSERT INTO balance_refresh(id,health_json) VALUES(1,?)
+      ON CONFLICT(id) DO UPDATE SET health_json=json_set(balance_refresh.health_json,'$.lastAttempt',?,'$.error',?)
+      WHERE ? >= json_extract(balance_refresh.health_json,'$.lastAttempt')`,
+      )
+      .bind(
+        JSON.stringify({ lastAttempt: at, lastSuccess: null, error }),
+        at,
+        error,
+        at,
+      )
+      .run();
+  }
   private async revision(): Promise<number> {
     return (await this.db
       .prepare("SELECT revision FROM ledger_meta WHERE id=1")

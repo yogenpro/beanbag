@@ -2,7 +2,18 @@
 
 The pure `src/accounting` modules take normalized source records, a two-account
 boundary, optional historical valuations, and durable user decisions. They have
-no Cloudflare/Plaid/React imports and can later run against a Node/SQLite adapter.
+no Cloudflare/Plaid/React imports. The [local integration CLI](local-integration.md)
+now reuses them and the D1 SQL repository through a Node SQLite adapter. Its
+private persistence and encryption key are outside Git; it is a separate entry
+point with no production authentication bypass.
+
+The browser is strictly read-only. After Access authentication, dashboard API
+routes accept only GET/HEAD; all mutation methods return 405 with no database or
+provider effects. Only the exact independently signed webhook path can write via
+HTTP. Ingestion also runs through the scheduled entry point or private CLI.
+The UI can display existing decision history but cannot create/change decisions,
+receipts, connection state or sync jobs. Reconciliation belongs to operator
+tooling, with the existing repository revision guards and audit records.
 
 ```text
 Access → Worker authentication → Hono API → D1 repository
@@ -51,7 +62,7 @@ Per-product leases prevent overlapping fetches. A singleton ledger revision
 uses compare-and-swap inside each publication transaction, so a concurrent sync
 or review cannot silently overwrite newer classification. Failed guards abort
 the whole batch. The next cron or explicit sync retries from the durable cursor;
-interactive clients reload before retrying a conflicting decision.
+operator integrations reload before retrying a conflicting decision.
 
 The current Worker caps a staged sync at 5,000 changes/100 pages and uses one
 atomic batch. An oversized initial history fails visibly without cursor advance;
@@ -82,6 +93,32 @@ resolved. If the security ID itself changes, human reconciliation is necessary;
 there is no automatic remapping based solely on holdings.
 
 ## Coverage and failure handling
+
+Balance observations use separate `balance_snapshots` and `balance_refresh`
+tables (migration `0002_balances.sql`). The collector reads selected checking
+from `/accounts/get` and selected brokerage from `/investments/holdings/get`;
+the latter includes the margin-loan field. Requests use selected account IDs,
+and normalization independently filters and checks the returned roles. No
+additional holdings sum is added to the institution's total asset value.
+Exact decimal balances become integer cents once; brokerage borrowing is
+subtracted once. Missing values/currencies are never silently zeroed or converted.
+
+Both responses must validate before publishing one immutable observation and
+its success status in a transaction. Failure leaves old snapshots intact with
+independent error status; out-of-order attempts cannot replace newer health.
+A local owner attestation can supply zero borrowing for just that observation
+if the provider omits it; contradictory provider borrowing preserves both pieces
+of evidence and withholds net worth pending reconciliation.
+The original missing provider field and the dated attestation remain distinct.
+
+The API returns the latest snapshot independently of the selected report period,
+plus the latest saved observation per Pacific day in that period. A changed
+account boundary cannot splice histories. Missing daily samples remain gaps;
+there is no historical reconstruction or use of balances as income evidence.
+Collection timestamps do not claim real-time institution freshness. These
+semantics follow [Plaid Accounts](https://plaid.com/docs/api/accounts/) and
+[Investments](https://plaid.com/docs/api/products/investments/). The collector does
+not call the paid real-time Balance or Investments Refresh endpoints.
 
 Checking and investments retain separate attempts, successes, most recent posted
 dates, queried-window start, safe error code and coverage limitation. Complete

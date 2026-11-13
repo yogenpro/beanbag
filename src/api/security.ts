@@ -4,8 +4,7 @@ import {
   type JWTPayload,
   type JWTVerifyGetKey,
 } from "jose";
-import type { MiddlewareHandler } from "hono";
-import type { Actor, AppContext, Env } from "./env";
+import type { Actor, Env } from "./env";
 
 const keys = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 const list = (value?: string) =>
@@ -84,27 +83,3 @@ export async function verifyAccessToken(
   });
   return actorFromClaims(payload, env);
 }
-export const mutationGuard: MiddlewareHandler<AppContext> = async (c, next) => {
-  if (["GET", "HEAD", "OPTIONS"].includes(c.req.method)) return next();
-  const expected = c.get("demo") ? new URL(c.req.url).origin : c.env.APP_ORIGIN;
-  if (
-    !expected ||
-    c.req.header("Origin") !== expected ||
-    c.req.header("X-Beanbag-Request") !== "1" ||
-    !c.req.header("Content-Type")?.startsWith("application/json")
-  )
-    return c.json({ error: "Same-origin JSON request required" }, 403);
-  if (!c.get("demo") && c.env.DB) {
-    const identity = c.get("actor").id,
-      window = Math.floor(Date.now() / 60_000);
-    const row = await c.env.DB.prepare(
-      `INSERT INTO mutation_limits(identity,window,hits) VALUES(?,?,1)
-      ON CONFLICT(identity) DO UPDATE SET window=excluded.window, hits=CASE WHEN mutation_limits.window=excluded.window THEN mutation_limits.hits+1 ELSE 1 END RETURNING hits`,
-    )
-      .bind(identity, window)
-      .first<{ hits: number }>();
-    if (!row || row.hits > 20)
-      return c.json({ error: "Please wait a minute before trying again" }, 429);
-  }
-  await next();
-};

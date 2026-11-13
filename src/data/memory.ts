@@ -16,9 +16,38 @@ import {
   type SyncCommit,
 } from "./repository";
 import { ConflictError } from "./d1";
+import {
+  emptyBalanceHealth,
+  type BalanceSnapshot,
+} from "../accounting/balances";
 
 /** Local synthetic preview and test adapter. Never selected on a public hostname. */
 export class MemoryLedger implements LedgerRepository {
+  snapshots: BalanceSnapshot[] = [];
+  balanceStatus = emptyBalanceHealth();
+  async balanceSnapshots() {
+    return structuredClone(this.snapshots);
+  }
+  async balanceHealth() {
+    return structuredClone(this.balanceStatus);
+  }
+  async saveBalanceSnapshot(snapshot: BalanceSnapshot) {
+    if (!this.snapshots.some((s) => s.capturedAt === snapshot.capturedAt))
+      this.snapshots.push(structuredClone(snapshot));
+    if (
+      !this.balanceStatus.lastAttempt ||
+      snapshot.capturedAt >= this.balanceStatus.lastAttempt
+    )
+      this.balanceStatus = {
+        lastAttempt: snapshot.capturedAt,
+        lastSuccess: snapshot.capturedAt,
+        error: null,
+      };
+  }
+  async failBalanceRefresh(at: string, error: string) {
+    if (!this.balanceStatus.lastAttempt || at >= this.balanceStatus.lastAttempt)
+      this.balanceStatus = { ...this.balanceStatus, lastAttempt: at, error };
+  }
   records = new Map<string, Source>();
   decisions: Override[] = [];
   prices: Record<string, Valuation> = {};

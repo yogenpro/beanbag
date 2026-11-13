@@ -29,10 +29,13 @@ npm run test:sandbox -- --check-config # checks settings without contacting Plai
 npm run test:sandbox                  # explicit API integration run
 ```
 
-Only the short-lived Sandbox Item token lives in the test process. The runner
-redacts configured credentials and Plaid tokens from output. It saves no provider
-payloads, tokens or database files. The suite attempts to remove its simulated
-Item after completion, including ordinary test failures.
+The Sandbox Item token stays in the test process. The local Hosted Link contract
+check temporarily stores encrypted session state in an owner-only SQLite file
+outside Git, then removes that test directory and its separate temporary key.
+The runner redacts configured credentials, Plaid tokens and Hosted Link URLs from
+output. No provider payloads, tokens or database files are retained as artifacts.
+The suite attempts to remove its simulated Item after completion, including
+ordinary test failures.
 
 ## What is exercised
 
@@ -45,6 +48,15 @@ account mix, which may contain retirement accounts without a brokerage account.
 The suite discovers fresh account IDs and uses an isolated in-memory SQLite
 database with the real migration/repository.
 
+Before injecting additional checking transactions, the suite waits for Plaid's
+`HISTORICAL_UPDATE_COMPLETE` status within a bounded setup window. Seeding before
+that initial fetch settles can race initialization: Sandbox returned empty
+selected and unfiltered streams until this ordering was fixed. The application
+does not interpret that status as proof of complete household coverage.
+
+- Create a Hosted Link session through the local CLI service, retrieve it through
+  `/link/token/get`, and clear private pending state without a public callback.
+  An unopened session may omit `link_sessions`; this is pending consent.
 - Seed external payroll, a card payment, an internal brokerage transfer and
   outbound Zelle through `/sandbox/transactions/create`.
 - Seed an unselected savings account and verify its transaction is not ingested.
@@ -65,12 +77,14 @@ No webhook delivery test is claimed: it needs a separately configured callback.
 
 ## Verified execution
 
-The four integration tests passed against Plaid's Sandbox API using the explicit
+The five integration tests passed against Plaid's Sandbox API using the explicit
 household fixture. Checking amounts reconciled exactly; the 2.5-share receipt
 remained excluded until approval, then retained its invented $150.12 historical
 close and $375.30 event value across another investment sync. The simulated
-login failure left the checking cursor unchanged. Item removal completed after
-the suite. These are Sandbox results, not evidence of live institution coverage.
+login failure left the checking cursor unchanged. Hosted Link creation/retrieval
+also passed; interactive owner consent is not automated by this suite. Item
+removal completed after the suite. These are Sandbox results, not evidence of live
+institution coverage.
 
 ## GitHub Actions
 

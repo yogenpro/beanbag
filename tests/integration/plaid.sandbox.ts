@@ -10,6 +10,11 @@ import { report } from "../../src/accounting/report";
 import { selectAccounts } from "../../src/api/onboarding";
 import type { Account } from "../../src/accounting/types";
 import { sqliteD1 } from "../sqlite-d1";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { beginLink, cancelLink } from "../../src/local/link";
+import { openLocalStore, type LocalStore } from "../../src/local/store";
 
 // Explicit suite, never discovered by the normal credential-free test command.
 // No caller-provided host/environment: all HTTP requests use Plaid Sandbox.
@@ -165,6 +170,27 @@ describe("Plaid Sandbox → normalization → SQLite → accounting", () => {
         .bind(account.id, account.role, account.label, account.mask)
         .run();
     }
+    // Sandbox initialization is asynchronous. Wait for its initial history to
+    // settle before adding incremental fixtures, so initial data cannot race
+    // the injected transactions. This probe does not publish a ledger cursor.
+    const readyDeadline = Date.now() + 60_000;
+    let ready = false;
+    while (Date.now() < readyDeadline) {
+      const initial = await api.post("/transactions/sync", {
+        access_token: token,
+        count: 500,
+        options: { account_id: checking.account_id },
+      });
+      if (initial.transactions_update_status === "HISTORICAL_UPDATE_COMPLETE") {
+        ready = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    if (!ready)
+      throw new Error(
+        "Sandbox initial transaction history was not ready within the bounded setup window.",
+      );
     await api.post("/sandbox/transactions/create", {
       access_token: token,
       transactions: [
@@ -211,6 +237,40 @@ describe("Plaid Sandbox → normalization → SQLite → accounting", () => {
     }
   });
 
+  it("creates and retrieves the local Hosted Link session without a public callback", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "beanbag-hosted-sandbox-"));
+    let store: LocalStore | undefined;
+    try {
+      store = openLocalStore({
+        project: resolve(import.meta.dirname, "../.."),
+        environment: "sandbox",
+        clientId: "unused-local-test-client",
+        secret: "unused-local-test-secret",
+        checkingMask: "0001",
+        brokerageMask: "0002",
+        stateDirectory: join(directory, "data"),
+        keyFile: join(directory, "config/local.key"),
+        fingerprint: "synthetic-hosted-link-contract",
+      });
+      const url = await beginLink(store, api);
+      expect(new URL(url).hostname === "secure.plaid.com").toBe(true);
+      const session = await store.session();
+      expect(Boolean(session?.linkToken)).toBe(true);
+      const result = await api.post("/link/token/get", {
+        link_token: session!.linkToken,
+      });
+      expect(
+        result.link_sessions == null || Array.isArray(result.link_sessions),
+      ).toBe(true);
+      expect(result.link_sessions?.length ?? 0).toBe(0);
+      await cancelLink(store, api);
+      expect(await store.session()).toBeNull();
+    } finally {
+      store?.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("ingests only selected checking and applies the boundary to provider-created transactions", async () => {
     const sync = new SyncService(api, repo, token!);
     let seeded = 0;
@@ -222,7 +282,26 @@ describe("Plaid Sandbox → normalization → SQLite → accounting", () => {
       if (seeded >= 4) break;
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    expect(seeded).toBe(4);
+    if (seeded !== 4) {
+      // Safe counts distinguish delayed provider data from filtering/persistence
+      // failures without dumping response bodies or provider identifiers.
+      const scoped = await api.post("/transactions/sync", {
+        access_token: token,
+        count: 500,
+        options: { account_id: selected[0].id },
+      });
+      const all = await api.post("/transactions/sync", {
+        access_token: token,
+        count: 500,
+      });
+      const rows = [
+        ...(all.added ?? []),
+        ...(all.modified ?? []),
+      ] as JsonRecord[];
+      throw new Error(
+        `Sandbox checking fixture unavailable: ledger=${(await repo.sources()).length}, selected-stream=${scoped.added?.length ?? 0}, all-stream=${rows.length}, selected-matches=${rows.filter((r) => r.account_id === selected[0].id).length}, description-matches=${rows.filter((r) => typeof r.name === "string" && r.name.includes(run)).length}.`,
+      );
+    }
     const records = (await repo.events()).filter((e) =>
       e.description.includes(run),
     );

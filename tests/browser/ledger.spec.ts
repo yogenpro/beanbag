@@ -1,82 +1,107 @@
 import { expect, test } from "@playwright/test";
 
-test("responsive ledger, exact totals, drilldown and durable review through reload", async ({
+test("read-only dashboard: totals, charts, filters and record evidence without writes", async ({
   page,
 }) => {
-  const errors: string[] = [];
+  const errors: string[] = [],
+    writes: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const reset = await page.request.post("/api/overrides", {
-    headers: { Origin: "http://127.0.0.1:8787", "X-Beanbag-Request": "1" },
-    data: {
-      eventId: "bank:demo-review-bank",
-      baseRevision: "synthetic-v1",
-      kind: "unknown",
-      rationale: "Reset this synthetic example for a fresh browser review.",
-    },
+  page.on("request", (request) => {
+    if (!["GET", "HEAD"].includes(request.method()))
+      writes.push(`${request.method()} ${request.url()}`);
   });
-  expect(reset.status()).toBe(201);
   await page.goto("/");
   await expect(
     page.getByText("Illustrative data", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Your household, in view." }),
+    page.getByRole("heading", { name: "Overview", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "View total recorded income records" }),
-  ).toBeVisible();
-  const report = await (await page.request.get("/api/report")).json();
-  expect(report.totals.netCashFlow).toBe(
-    report.totals.cashIncome - report.totals.spending,
+  await expect(page.getByText("Read-only", { exact: true })).toBeVisible();
+  const before = await (await page.request.get("/api/report")).json();
+  const balances = page.getByRole("region", {
+    name: "Tracked net worth",
+    exact: true,
+  });
+  const total = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(before.balances.latest.netWorthCents / 100);
+  await expect(balances.locator(".balance-total")).toHaveText(total);
+  expect(before.totals.netCashFlow).toBe(
+    before.totals.cashIncome - before.totals.spending,
   );
-  expect(report.totals.netRecordedFlow).toBe(
-    report.totals.cashIncome +
-      report.totals.stockIncome -
-      report.totals.spending,
+  expect(before.totals.netRecordedFlow).toBe(
+    before.totals.cashIncome +
+      before.totals.stockIncome -
+      before.totals.spending,
   );
+  await page.getByRole("button", { name: "Year", exact: true }).click();
+  const slider = balances.getByRole("slider", { name: "Snapshot date" });
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await expect(slider).toHaveValue("0");
+  await balances.getByText("Snapshots & freshness", { exact: true }).click();
+  await expect(balances.getByRole("table")).toBeVisible();
+  await page.getByRole("button", { name: "Last month", exact: true }).click();
+  await expect(balances.locator(".balance-total")).toHaveText(total);
+  await page.getByRole("button", { name: "This month", exact: true }).click();
   await page
     .getByRole("button", { name: "View checking spending records" })
     .click();
   await expect(page.getByLabel("Filter activity")).toHaveValue("spending");
+  await page.locator("#overview-tab").click();
+  await page.getByRole("button", { name: "View entries", exact: true }).click();
+  await expect(page.getByLabel("Filter activity")).toHaveValue("unclassified");
   await expect(
-    page.getByRole("heading", { name: "Follow every dollar." }),
+    page.getByRole("heading", { name: /Unclassified entries/ }),
   ).toBeVisible();
-  await page.locator("#review-tab").click();
-  const target = page.getByRole("button", {
-    name: "Brokerage cash movement · verify destination",
-    exact: true,
-  });
-  await target.click();
-  await expect(page.getByRole("dialog")).toBeVisible();
   await page
-    .getByRole("combobox", { name: "Classification", exact: true })
-    .selectOption("spending");
-  await page
-    .getByLabel("Decision rationale")
-    .fill("Synthetic statement confirms an external checking payment.");
-  await page.getByRole("button", { name: "Preview change" }).click();
-  await expect(page.getByText("Effect on this record")).toBeVisible();
-  await page.getByRole("button", { name: "Save decision" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+    .getByRole("button", {
+      name: "Brokerage cash movement · unknown destination",
+      exact: true,
+    })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByText(/excluded from income and spending/),
+  ).toBeVisible();
+  await expect(dialog.locator("form, input, textarea, select")).toHaveCount(0);
+  await dialog
+    .getByText("Source & classification history", { exact: true })
+    .click();
+  await expect(dialog.locator("pre")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: /Save decision|Preview change|Record stock receipt|Needs review/,
+    }),
+  ).toHaveCount(0);
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Your household, in view." }),
+    page.getByRole("heading", { name: "Overview", exact: true }),
   ).toBeVisible();
-  const detail = await (
-    await page.request.get("/api/events/bank:demo-review-bank")
-  ).json();
-  expect(detail.event.kind).toBe("spending");
-  expect(detail.history.length).toBeGreaterThan(0);
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > window.innerWidth,
-  );
-  expect(overflow).toBe(false);
+  const after = await (await page.request.get("/api/report")).json();
+  expect(after.totals).toEqual(before.totals);
+  expect(after.review).toEqual(before.review);
+  expect(writes).toEqual([]);
   expect(errors).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
 });
 
-test("date controls, pending preview, receipt validation and data health", async ({
+test("date controls, pending facts, historical valuation and data-health refresh are read-only", async ({
   page,
 }) => {
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (!["GET", "HEAD"].includes(request.method())) writes.push(request.url());
+  });
   await page.goto("/");
   await page.getByRole("button", { name: "Year", exact: true }).click();
   await expect(
@@ -90,18 +115,47 @@ test("date controls, pending preview, receipt validation and data health", async
   await expect(
     page.getByText("Not in totals", { exact: true }).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Record stock receipt" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page.getByLabel("Historical price source")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Card payment · Pending", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByText("Pending transactions are excluded from confirmed totals."),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("Filter activity").selectOption("stock_income");
+  await page
+    .getByRole("button", { name: "EXM · External share receipt", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByText("Historical valuation", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog").locator("form, input, textarea, select"),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.locator("#health-tab").click();
   await expect(
     page.getByRole("heading", { name: "Checking transactions", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Not established").first()).toBeVisible();
-  await page.getByRole("button", { name: "Request sync" }).click();
-  await expect(page.getByRole("status")).toContainText("no financial provider");
+  await expect(
+    page.getByRole("button", {
+      name: /Request sync|Connect selected accounts|Repair Plaid connection/,
+    }),
+  ).toHaveCount(0);
+  const refreshed = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/report?") &&
+      response.request().method() === "GET",
+  );
+  await page.getByRole("button", { name: "Refresh view", exact: true }).click();
+  await refreshed;
+  await expect(
+    page.getByRole("heading", { name: "Account balances", exact: true }),
+  ).toBeVisible();
+  expect(writes).toEqual([]);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,

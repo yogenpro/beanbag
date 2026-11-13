@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { createApp } from "../src/api/app";
 import {
@@ -13,6 +13,7 @@ import { encryptToken, decryptToken } from "../src/providers/plaid/secrets";
 import { verifyWebhook, sha256 } from "../src/providers/plaid/webhook";
 import type { PlaidApi, JsonRecord } from "../src/providers/plaid/client";
 import { demoLedger } from "../src/data/demo";
+import { sqliteD1 } from "./sqlite-d1";
 
 const assets = {
   fetch: async () => new Response("synthetic asset"),
@@ -151,50 +152,79 @@ describe("Access and route security", () => {
       verifyAccessToken(missingExpiry, config, async () => publicKey),
     ).rejects.toThrow();
   });
-  it("enforces same-origin JSON and custom CSRF header for mutations", async () => {
-    const app = createApp({ demo: demoLedger() });
-    const denied = await app.request(
-      "http://localhost/api/sync",
-      {
-        method: "POST",
-        headers: {
-          Origin: "https://hostile.example.invalid",
-          "Content-Type": "application/json",
-          "X-Beanbag-Request": "1",
-        },
-        body: "{}",
-      },
-      env,
-    );
-    expect(denied.status).toBe(403);
-    const missingHeader = await app.request(
-      "http://localhost/api/sync",
-      {
-        method: "POST",
-        headers: {
-          Origin: "http://localhost",
-          "Content-Type": "application/json",
-        },
-        body: "{}",
-      },
-      env,
-    );
-    expect(missingHeader.status).toBe(403);
-    const allowed = await app.request(
-      "http://localhost/api/sync",
-      {
-        method: "POST",
-        headers: {
-          Origin: "http://localhost",
-          "Content-Type": "application/json",
-          "X-Beanbag-Request": "1",
-        },
-        body: "{}",
-      },
-      env,
-    );
-    expect(allowed.status).toBe(200);
-  });
+  it.each([false, true])(
+    "rejects dashboard writes without database or provider effects (admin=%s)",
+    async (admin) => {
+      const { db, sqlite } = sqliteD1();
+      const onSyncRequested = vi.fn();
+      const app = createApp({
+        authenticate: async () => ({
+          id: "test-viewer",
+          email: "viewer@example.invalid",
+          admin,
+        }),
+        onSyncRequested,
+      });
+      try {
+        const changes = () =>
+          sqlite.prepare("SELECT total_changes() AS count").get()!.count;
+        const before = changes();
+        for (const path of [
+          "/api/overrides",
+          "/api/review/preview",
+          "/api/receipts",
+          "/api/sync",
+          "/api/admin/link-token",
+          "/api/admin/exchange",
+          "/api/admin/link-complete",
+        ]) {
+          const denied = await app.request(
+            "https://private.example.invalid" + path,
+            {
+              method: "POST",
+              headers: {
+                Origin: "https://private.example.invalid",
+                "Content-Type": "application/json",
+                "X-Beanbag-Request": "1",
+              },
+              body: "{}",
+            },
+            { ASSETS: assets, DB: db },
+          );
+          expect(denied.status).toBe(405);
+          expect(denied.headers.get("Allow")).toBe("GET, HEAD");
+          expect(await denied.json()).toEqual({
+            error: "This dashboard is read-only",
+          });
+        }
+        for (const method of ["PUT", "PATCH", "DELETE", "OPTIONS"]) {
+          expect(
+            (
+              await app.request(
+                "https://private.example.invalid/api/report",
+                { method },
+                { ASSETS: assets, DB: db },
+              )
+            ).status,
+          ).toBe(405);
+        }
+        expect(changes()).toBe(before);
+        expect(onSyncRequested).not.toHaveBeenCalled();
+        const read = await app.request(
+          "https://private.example.invalid/api/report",
+          {},
+          { ASSETS: assets, DB: db },
+        );
+        expect(read.status).toBe(200);
+        expect(changes()).toBe(before);
+        expect(read.headers.get("Content-Security-Policy")).not.toContain(
+          "plaid.com",
+        );
+      } finally {
+        sqlite.close();
+      }
+    },
+  );
   it("always labels demo data and never enables onboarding in demo mode", async () => {
     const app = createApp({ demo: demoLedger() });
     const response = await app.request("http://localhost/api/report", {}, env);
@@ -217,7 +247,7 @@ describe("Access and route security", () => {
           env,
         )
       ).status,
-    ).toBe(403);
+    ).toBe(405);
     expect(
       (await app.request("http://localhost/api/missing", {}, env)).status,
     ).toBe(404);

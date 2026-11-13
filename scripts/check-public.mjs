@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, lstatSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -62,6 +62,18 @@ const extraTerms = process.env.BEANBAG_PRIVACY_TERMS_FILE
       .filter(Boolean)
   : [];
 for (const file of [...new Set(files)]) {
+  let info;
+  try {
+    info = lstatSync(file);
+  } catch (error) {
+    // Git lists tracked deletions until they are staged; there is no file to publish.
+    if (error.code === "ENOENT") continue;
+    throw error;
+  }
+  if (info.isSymbolicLink()) {
+    failures.push(file + ": publication scan refuses symlinks");
+    continue;
+  }
   if (
     /^(?:private|exports|backups|data)\//.test(file) ||
     /(?:\.sqlite|\.db|\.pem|\.key|\.age|\.log)$/.test(file) ||
@@ -71,7 +83,7 @@ for (const file of [...new Set(files)]) {
     failures.push(file + ": private file type");
     continue;
   }
-  if (statSync(file).size > 1_000_000) {
+  if (info.size > 1_000_000) {
     failures.push(file + ": unexpected large file");
     continue;
   }

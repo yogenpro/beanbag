@@ -6,11 +6,12 @@ import type {
   Override,
 } from "../accounting/types";
 import type { Report } from "../accounting/report";
+import type { BalanceReport } from "../accounting/balances";
 export type Dashboard = Report & {
+  balances: BalanceReport;
   accounts: Account[];
   coverage: Coverage[];
   illustrative: boolean;
-  actor: { admin: boolean };
   connectionStatus: string;
   trend: Report["months"];
 };
@@ -19,21 +20,8 @@ export type Detail = {
   source: Source;
   history: Override[];
 };
-export async function api<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(
-    path,
-    body === undefined
-      ? { credentials: "same-origin" }
-      : {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Beanbag-Request": "1",
-          },
-          body: JSON.stringify(body),
-        },
-  );
+export async function api<T>(path: string): Promise<T> {
+  const response = await fetch(path, { credentials: "same-origin" });
   const payload = (await response.json()) as { error?: string };
   if (!response.ok)
     throw new Error(payload.error ?? "Unable to load the household ledger");

@@ -2,7 +2,8 @@
 
 Beanbag counts movement across a boundary of exactly two explicitly selected
 accounts: joint checking and joint brokerage. It is a reporting convention,
-not tax income, net worth, or credit-card purchase accounting.
+not tax income or credit-card purchase accounting. A separate balance view now
+tracks the latest value/net worth of that selected pair and saved daily history.
 
 - [x] M0: Worker + React + Hono scaffold, D1 migration and synthetic local spike.
 - [ ] M0 external: independent Plaid consent, product/plan access and one genuine
@@ -22,27 +23,61 @@ code, assets, migrations and portable binding contracts. No production deploymen
 or infrastructure mutation is part of this implementation milestone.
 
 The accounting engine and provider interfaces do not depend on Workers. D1 is
-the only implemented persistence adapter; a VPS adapter is deliberately deferred.
+the production persistence adapter. A Node SQLite adapter now supports the
+[private local CLI spike](local-integration.md); a hosted VPS service is deferred.
+
+## Read-only dashboard — November 12
+
+The owner requested a strictly read-only dashboard after accepting the visual
+design. This supersedes the milestone's browser review queue and mutation flows.
+Overview, Activity and Data health remain; record details and existing decision
+history are viewable. Unclassified entries are explained as exclusions from
+income/spending rather than presented as work to perform. Browser receipt entry,
+classification edits, Link consent/repair and manual sync controls are removed.
+The server rejects non-GET/HEAD dashboard API requests for all identities without
+database writes or provider calls. Signed webhooks, scheduled ingestion and the
+private operator CLI retain their separate roles. No new unattended job is enabled.
 
 ## Verification
 
-The local implementation passes 93 accounting, ingestion, SQLite persistence,
-Access/CSRF/encryption/webhook, credential isolation and publication-guard tests,
-plus four browser tests across desktop and
-mobile. Type checking, production UI build, Worker dry run, real local D1
-migration and public-source privacy scanning pass. Browser testing includes
-source drilldowns, preview/save/reload of reviews, date controls, pending preview,
-receipt form, data health, and no horizontal page overflow.
+The local implementation passes 128 accounting, ingestion, balance history, SQLite persistence,
+Access/read-only API/encryption/webhook, credential isolation and publication-guard tests.
+Type checking, production UI build, Worker dry run and public-source privacy
+scanning pass. The redesigned UI passes four browser tests across desktop/mobile;
+the published baseline also passed a real local D1 migration. Browser testing includes
+read-only source drilldowns, unchanged totals after browsing, date controls,
+pending exclusions, historical valuation, chart selection and data health.
+Browser interactions issue no write requests and have no horizontal page overflow.
 
-Real Plaid consent, a genuine incoming security receipt, an entitled automatic
-historical-price feed, private Access policy provisioning, and live backup/restore
-remain external or later operating-milestone work. Reviewed historical quotes
-and manual receipts are the implemented fallback; no live financial automation
-or deployment is claimed by the synthetic checks.
+The November 12 visual update uses the owner's crisp white, ink and restrained
+blue direction with Impeccable. It replaces the original card-heavy treatment
+with persistent navigation, open financial summaries, distinct cash/in-kind
+series and responsive activity rows. Data health remains a dedicated view. The
+overview's filtered “View all” action now preserves its selected record filter.
+Product context and the built visual system live in `PRODUCT.md`, `DESIGN.md`
+and `.impeccable/`; generated review screenshots are ignored and illustrative only.
+
+Independent Production Plaid consent and initial checking/investment sync have
+now succeeded through the private local CLI. Both feeds contain source records,
+and structural account-isolation and report checks pass. The owner attested to
+the incoming candidates' external origin, dates and quantities; historical price
+evidence remains pending. See [next steps](next-steps.md) for the private workflow.
+Independent receipt valuation, an entitled automatic historical-price feed, private
+Access policy provisioning, and live backup/restore remain later work. Reviewed
+historical quotes and manual receipts are the implemented fallback; no unattended
+financial automation or deployment is claimed.
+
+Tracked-account balance history uses separate observations and never revalues
+receipt income. The latest account value, borrowing and net worth have explicit
+missing/conflicting states, with a daily chart and accessible snapshot table.
+`report` exports the same view as an offline, read-only private HTML file; the
+running local browser remains illustrative. Snapshot collection has no new cron.
 
 An optional [Sandbox API integration suite](sandbox-testing.md) is available via
-`npm run test:sandbox`, with a separate manual GitHub Actions workflow. All four
+`npm run test:sandbox`, with a separate manual GitHub Actions workflow. All five
 integration tests have passed against Plaid Sandbox using explicit simulated
-accounts, including share-receipt review and frozen historical valuation. These
+accounts, including local Hosted Link creation/retrieval, share-receipt review and
+frozen historical valuation. Initial Sandbox transaction history is allowed to
+settle before injecting the checking fixture to avoid an initialization race. These
 are additional to the credential-free tests above; real institution validation
 remains an external feasibility gate.

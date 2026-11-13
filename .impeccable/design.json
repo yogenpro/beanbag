@@ -1,0 +1,497 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T14:45:16.781490Z",
+  "title": "Design System: Beanbag",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper white",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Cool rail",
+        "canonical": "#f3f5fa",
+        "tonalRamp": [
+          "oklch(15% 0.0015 268.55)",
+          "oklch(26% 0.0034 268.55)",
+          "oklch(38% 0.0053 268.55)",
+          "oklch(49% 0.0070 268.55)",
+          "oklch(61% 0.0069 268.55)",
+          "oklch(72% 0.0055 268.55)",
+          "oklch(84% 0.0034 268.55)",
+          "oklch(95% 0.0011 268.55)"
+        ]
+      },
+      "field": {
+        "role": "neutral",
+        "displayName": "Inset field",
+        "canonical": "#f6f7fa",
+        "tonalRamp": [
+          "oklch(15% 0.0009 271.37)",
+          "oklch(26% 0.0020 271.37)",
+          "oklch(38% 0.0031 271.37)",
+          "oklch(49% 0.0041 271.37)",
+          "oklch(61% 0.0040 271.37)",
+          "oklch(72% 0.0032 271.37)",
+          "oklch(84% 0.0020 271.37)",
+          "oklch(95% 0.0006 271.37)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#202735",
+        "tonalRamp": [
+          "oklch(15% 0.0062 263.94)",
+          "oklch(26% 0.0134 263.94)",
+          "oklch(38% 0.0213 263.94)",
+          "oklch(49% 0.0280 263.94)",
+          "oklch(61% 0.0275 263.94)",
+          "oklch(72% 0.0219 263.94)",
+          "oklch(84% 0.0134 263.94)",
+          "oklch(95% 0.0042 263.94)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary ink",
+        "canonical": "#505c70",
+        "tonalRamp": [
+          "oklch(15% 0.0079 260.60)",
+          "oklch(26% 0.0172 260.60)",
+          "oklch(38% 0.0272 260.60)",
+          "oklch(49% 0.0358 260.60)",
+          "oklch(61% 0.0351 260.60)",
+          "oklch(72% 0.0279 260.60)",
+          "oklch(84% 0.0172 260.60)",
+          "oklch(95% 0.0054 260.60)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted ink",
+        "canonical": "#667085",
+        "tonalRamp": [
+          "oklch(15% 0.0077 265.11)",
+          "oklch(26% 0.0168 265.11)",
+          "oklch(38% 0.0266 265.11)",
+          "oklch(49% 0.0350 265.11)",
+          "oklch(61% 0.0343 265.11)",
+          "oklch(72% 0.0273 265.11)",
+          "oklch(84% 0.0168 265.11)",
+          "oklch(95% 0.0053 265.11)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Fine rule",
+        "canonical": "#e2e6ef",
+        "tonalRamp": [
+          "oklch(15% 0.0028 266.70)",
+          "oklch(26% 0.0062 266.70)",
+          "oklch(38% 0.0098 266.70)",
+          "oklch(49% 0.0129 266.70)",
+          "oklch(61% 0.0127 266.70)",
+          "oklch(72% 0.0101 266.70)",
+          "oklch(84% 0.0062 266.70)",
+          "oklch(95% 0.0019 266.70)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Restrained blue",
+        "canonical": "#3556c8",
+        "tonalRamp": [
+          "oklch(15% 0.0399 267.16)",
+          "oklch(26% 0.0871 267.16)",
+          "oklch(38% 0.1379 267.16)",
+          "oklch(49% 0.1814 267.16)",
+          "oklch(61% 0.1778 267.16)",
+          "oklch(72% 0.1415 267.16)",
+          "oklch(84% 0.0871 267.16)",
+          "oklch(95% 0.0272 267.16)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Deep action blue",
+        "canonical": "#2645ad",
+        "tonalRamp": [
+          "oklch(15% 0.0374 266.44)",
+          "oklch(26% 0.0817 266.44)",
+          "oklch(38% 0.1293 266.44)",
+          "oklch(49% 0.1701 266.44)",
+          "oklch(61% 0.1667 266.44)",
+          "oklch(72% 0.1327 266.44)",
+          "oklch(84% 0.0817 266.44)",
+          "oklch(95% 0.0255 266.44)"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Soft action blue",
+        "canonical": "#e9eefc",
+        "tonalRamp": [
+          "oklch(15% 0.0043 270.21)",
+          "oklch(26% 0.0094 270.21)",
+          "oklch(38% 0.0149 270.21)",
+          "oklch(49% 0.0196 270.21)",
+          "oklch(61% 0.0192 270.21)",
+          "oklch(72% 0.0153 270.21)",
+          "oklch(84% 0.0094 270.21)",
+          "oklch(95% 0.0029 270.21)"
+        ]
+      },
+      "cash": {
+        "role": "primary",
+        "displayName": "Cash blue",
+        "canonical": "#4263d5",
+        "tonalRamp": [
+          "oklch(15% 0.0394 267.77)",
+          "oklch(26% 0.0860 267.77)",
+          "oklch(38% 0.1362 267.77)",
+          "oklch(49% 0.1792 267.77)",
+          "oklch(61% 0.1756 267.77)",
+          "oklch(72% 0.1398 267.77)",
+          "oklch(84% 0.0860 267.77)",
+          "oklch(95% 0.0269 267.77)"
+        ]
+      },
+      "stock": {
+        "role": "secondary",
+        "displayName": "Stock lavender",
+        "canonical": "#a9b6ec",
+        "tonalRamp": [
+          "oklch(15% 0.0173 273.96)",
+          "oklch(26% 0.0376 273.96)",
+          "oklch(38% 0.0596 273.96)",
+          "oklch(49% 0.0784 273.96)",
+          "oklch(61% 0.0769 273.96)",
+          "oklch(72% 0.0612 273.96)",
+          "oklch(84% 0.0376 273.96)",
+          "oklch(95% 0.0118 273.96)"
+        ]
+      },
+      "stock-ink": {
+        "role": "secondary",
+        "displayName": "Stock ink",
+        "canonical": "#535c91",
+        "tonalRamp": [
+          "oklch(15% 0.0188 275.46)",
+          "oklch(26% 0.0411 275.46)",
+          "oklch(38% 0.0651 275.46)",
+          "oklch(49% 0.0856 275.46)",
+          "oklch(61% 0.0839 275.46)",
+          "oklch(72% 0.0668 275.46)",
+          "oklch(84% 0.0411 275.46)",
+          "oklch(95% 0.0128 275.46)"
+        ]
+      },
+      "outflow": {
+        "role": "neutral",
+        "displayName": "Outflow slate",
+        "canonical": "#8792a8",
+        "tonalRamp": [
+          "oklch(15% 0.0077 264.30)",
+          "oklch(26% 0.0169 264.30)",
+          "oklch(38% 0.0267 264.30)",
+          "oklch(49% 0.0352 264.30)",
+          "oklch(61% 0.0345 264.30)",
+          "oklch(72% 0.0274 264.30)",
+          "oklch(84% 0.0169 264.30)",
+          "oklch(95% 0.0053 264.30)"
+        ]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Review amber",
+        "canonical": "#845614",
+        "tonalRamp": [
+          "oklch(15% 0.0215 70.25)",
+          "oklch(26% 0.0470 70.25)",
+          "oklch(38% 0.0744 70.25)",
+          "oklch(49% 0.0979 70.25)",
+          "oklch(61% 0.0960 70.25)",
+          "oklch(72% 0.0764 70.25)",
+          "oklch(84% 0.0470 70.25)",
+          "oklch(95% 0.0147 70.25)"
+        ]
+      },
+      "warning-paper": {
+        "role": "semantic",
+        "displayName": "Review paper",
+        "canonical": "#fff8eb",
+        "tonalRamp": [
+          "oklch(15% 0.0041 83.06)",
+          "oklch(26% 0.0090 83.06)",
+          "oklch(38% 0.0142 83.06)",
+          "oklch(49% 0.0187 83.06)",
+          "oklch(61% 0.0183 83.06)",
+          "oklch(72% 0.0146 83.06)",
+          "oklch(84% 0.0090 83.06)",
+          "oklch(95% 0.0028 83.06)"
+        ]
+      },
+      "warning-line": {
+        "role": "semantic",
+        "displayName": "Review line",
+        "canonical": "#eddfc4",
+        "tonalRamp": [
+          "oklch(15% 0.0086 83.82)",
+          "oklch(26% 0.0187 83.82)",
+          "oklch(38% 0.0296 83.82)",
+          "oklch(49% 0.0390 83.82)",
+          "oklch(61% 0.0382 83.82)",
+          "oklch(72% 0.0304 83.82)",
+          "oklch(84% 0.0187 83.82)",
+          "oklch(95% 0.0058 83.82)"
+        ]
+      },
+      "error": {
+        "role": "semantic",
+        "displayName": "Error red",
+        "canonical": "#a43135",
+        "tonalRamp": [
+          "oklch(15% 0.0331 22.86)",
+          "oklch(26% 0.0723 22.86)",
+          "oklch(38% 0.1145 22.86)",
+          "oklch(49% 0.1507 22.86)",
+          "oklch(61% 0.1477 22.86)",
+          "oklch(72% 0.1175 22.86)",
+          "oklch(84% 0.0723 22.86)",
+          "oklch(95% 0.0226 22.86)"
+        ]
+      },
+      "error-paper": {
+        "role": "semantic",
+        "displayName": "Error paper",
+        "canonical": "#fff0f0",
+        "tonalRamp": [
+          "oklch(15% 0.0036 17.44)",
+          "oklch(26% 0.0078 17.44)",
+          "oklch(38% 0.0123 17.44)",
+          "oklch(49% 0.0162 17.44)",
+          "oklch(61% 0.0159 17.44)",
+          "oklch(72% 0.0127 17.44)",
+          "oklch(84% 0.0078 17.44)",
+          "oklch(95% 0.0024 17.44)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Main amount",
+        "purpose": "Primary recorded-income figure; the source adjusts it at intermediate widths."
+      },
+      "headline": {
+        "displayName": "Page heading",
+        "purpose": "Page title, reduced at mobile and narrow-mobile breakpoints."
+      },
+      "title": {
+        "displayName": "Panel title",
+        "purpose": "Compact analytical section heading."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "14px root and paragraph rhythm; local supporting descriptions use compact sizes."
+      },
+      "label": {
+        "displayName": "Control label",
+        "purpose": "Compact action text at the 14px root size."
+      },
+      "amount": {
+        "displayName": "Ledger amount",
+        "purpose": "Medium-weight record values with tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dialog-shadow",
+        "value": "0 20px 80px #111c3a26",
+        "purpose": "The modal dialog is the only raised surface."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-state",
+        "value": "background-color 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out",
+        "purpose": "Quiet button feedback without movement."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none !important; animation: none !important; scroll-behavior: auto !important;",
+        "purpose": "Applied under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1700px",
+        "query": "(min-width: 1700px)"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1200px",
+        "query": "(max-width: 1200px)"
+      },
+      {
+        "name": "top-navigation",
+        "value": "960px",
+        "query": "(max-width: 960px)"
+      },
+      {
+        "name": "mobile",
+        "value": "700px",
+        "query": "(max-width: 700px)"
+      },
+      {
+        "name": "narrow-mobile",
+        "value": "374px",
+        "query": "(max-width: 374px)"
+      }
+    ],
+    "focus": {
+      "outline": "2px solid var(--accent)",
+      "outlineOffset": "3px"
+    },
+    "backdrop": {
+      "background": "#18223866"
+    },
+    "tonalRampProvenance": "All tonal ramps are synthesized OKLCH previews, not implemented CSS tokens. Canonical colors match the DESIGN.md frontmatter and source CSS.",
+    "snippetNotes": "Snippets use generic labels only. Font sizes resolve source rem values against its 14px root. Chart proportions are invented previews. Inline icons preserve the Lucide paths used by the application."
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Blue action used for verified entry and saving decisions.",
+      "html": "<button class=\"ds-button ds-primary\" type=\"button\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg>Record stock receipt</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:10px 14px;border:1px solid var(--line,#e2e6ef);border-radius:var(--control-radius,6px);background:var(--paper,#ffffff);color:var(--ink,#202735);font-size:12.04px;font-weight:500;white-space:nowrap;cursor:pointer;font-family:\"DM Sans\",sans-serif;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-button:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}.ds-button:disabled{opacity:.5;cursor:not-allowed;}.ds-primary{background:var(--accent,#3556c8);border-color:var(--accent,#3556c8);color:var(--paper,#ffffff);}.ds-primary:hover{background:var(--accent-hover,#2645ad);border-color:var(--accent-hover,#2645ad);}@media(prefers-reduced-motion:reduce){.ds-button,.ds-nav button,.ds-period button,.ds-month{transition:none;}}"
+    },
+    {
+      "name": "Standard button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Outlined secondary action for sync and cancellation.",
+      "html": "<button class=\"ds-button ds-secondary\" type=\"button\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/></svg>Request sync</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:10px 14px;border:1px solid var(--line,#e2e6ef);border-radius:var(--control-radius,6px);background:var(--paper,#ffffff);color:var(--ink,#202735);font-size:12.04px;font-weight:500;white-space:nowrap;cursor:pointer;font-family:\"DM Sans\",sans-serif;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-button:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}.ds-button:disabled{opacity:.5;cursor:not-allowed;}.ds-secondary:hover{background:var(--field,#f6f7fa);border-color:#c8d0df;}.ds-secondary:active{background:var(--accent-soft,#e9eefc);}@media(prefers-reduced-motion:reduce){.ds-button,.ds-nav button,.ds-period button,.ds-month{transition:none;}}"
+    },
+    {
+      "name": "Text button",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Quiet blue drilldown action with an underline on hover.",
+      "html": "<button class=\"ds-text\" type=\"button\">Explore payments <svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button>",
+      "css": ".ds-text{display:flex;align-items:center;gap:8px;min-height:40px;padding:0;border:0;background:none;color:var(--accent,#3556c8);font-size:12.04px;font-weight:500;text-align:left;cursor:pointer;font-family:\"DM Sans\",sans-serif;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-text:hover{text-decoration:underline;text-underline-offset:3px;}.ds-text:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-text{transition:none;}}"
+    },
+    {
+      "name": "Icon button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "Compact close or record action with a visible focus ring.",
+      "html": "<button class=\"ds-icon\" type=\"button\" aria-label=\"Close dialog\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg></button>",
+      "css": ".ds-icon{display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;padding:8px;border:0;border-radius:var(--control-radius,6px);background:none;color:var(--muted,#667085);cursor:pointer;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-icon:hover{background:var(--accent-soft,#e9eefc);color:var(--accent,#3556c8);}.ds-icon:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-icon{transition:none;}}"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "White evidence-entry field with a visible label and blue keyboard focus.",
+      "html": "<label class=\"ds-label\" for=\"ds-evidence\">Evidence note<input class=\"ds-field\" id=\"ds-evidence\" type=\"text\" placeholder=\"Describe the evidence\" /></label>",
+      "css": ".ds-label{display:flex;flex-direction:column;gap:8px;color:var(--ink,#202735);font-size:13.02px;font-weight:500;font-family:\"DM Sans\",sans-serif;}.ds-field{width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--line,#e2e6ef);border-radius:var(--control-radius,6px);background:var(--paper,#ffffff);color:var(--ink,#202735);font-size:14px;font-weight:400;caret-color:var(--accent,#3556c8);font-family:\"DM Sans\",sans-serif;}.ds-field::placeholder{color:var(--muted,#667085);opacity:1;}.ds-field:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-item",
+      "description": "Pale selected rail row that becomes an underlined top-navigation item.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Preview navigation\"><button class=\"ds-active\" type=\"button\" aria-current=\"page\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg>Overview</button><button type=\"button\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M21 9H3\"/><path d=\"M21 15H3\"/></svg>Activity</button></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:6px;background:var(--rail,#f3f5fa);padding:12px;}.ds-nav button{display:flex;align-items:center;gap:10px;min-height:44px;padding:11px 12px;border:0;border-radius:var(--control-radius,6px);background:none;color:var(--secondary,#505c70);font-size:13.02px;font-weight:400;text-align:left;white-space:nowrap;cursor:pointer;font-family:\"DM Sans\",sans-serif;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-nav button:hover{background:#e9edf5;color:var(--ink,#202735);}.ds-nav button.ds-active{background:#e3e9fa;color:var(--accent-hover,#2645ad);font-weight:600;}.ds-nav button:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}@media(max-width:960px){.ds-nav{flex-direction:row;gap:16px;}.ds-nav button{padding:12px 4px;border-radius:0;border-bottom:2px solid transparent;}.ds-nav button.ds-active{background:transparent;border-bottom-color:var(--accent,#3556c8);}.ds-nav button:hover{background:transparent;color:var(--accent,#3556c8);}}@media(max-width:700px){.ds-nav{gap:8px;}.ds-nav button{min-height:48px;font-size:12.04px;gap:6px;}.ds-nav svg{display:none;}}@media(prefers-reduced-motion:reduce){.ds-button,.ds-nav button,.ds-period button,.ds-month{transition:none;}}"
+    },
+    {
+      "name": "Decision badges",
+      "kind": "chip",
+      "refersTo": "status",
+      "description": "Explicit noninteractive decision states with blue, amber, lavender, and neutral fills.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-status\">Checking income</span><span class=\"ds-status ds-review\">Needs review</span><span class=\"ds-status ds-stock\">Incoming stock transfers</span><span class=\"ds-status ds-pending\">Pending</span></div>",
+      "css": ".ds-badges{display:flex;flex-wrap:wrap;gap:8px;}.ds-status{display:inline-flex;align-items:center;gap:5px;border-radius:5px;padding:5px 7px;line-height:1.3;font-size:11.06px;background:var(--accent-soft,#e9eefc);color:var(--accent-hover,#2645ad);font-family:\"DM Sans\",sans-serif;}.ds-review{background:var(--warning-paper,#fff8eb);color:var(--warning,#845614);}.ds-stock{background:#eff0fa;color:var(--stock-ink,#535c91);}.ds-pending{background:#f0f2f6;color:var(--secondary,#505c70);}@media(max-width:700px){.ds-status{font-size:12.04px;}}"
+    },
+    {
+      "name": "Data-health container",
+      "kind": "card",
+      "refersTo": "health-card",
+      "description": "Bordered coverage surface with ruled sections and explicit unknown states.",
+      "html": "<section class=\"ds-health\" aria-labelledby=\"ds-health-title\"><div class=\"ds-health-heading\"><h2 id=\"ds-health-title\">Connection &amp; coverage</h2></div><div class=\"ds-health-body\"><h3>Checking transactions</h3><dl><div><dt>Last successful sync</dt><dd>Not synced</dd></div><div><dt>Complete through</dt><dd>Not established</dd></div></dl><p>A successful sync does not establish complete coverage.</p></div></section>",
+      "css": ".ds-health{border:1px solid var(--line,#e2e6ef);border-radius:var(--radius,12px);background:var(--paper,#ffffff);color:var(--ink,#202735);font-family:\"DM Sans\",sans-serif;}.ds-health-heading{padding:24px 24px 20px;}.ds-health h2{margin:0;font-size:15.96px;font-weight:600;letter-spacing:-.015em;}.ds-health-body{padding:24px;border-top:1px solid var(--line,#e2e6ef);}.ds-health h3{margin:0 0 24px;font-size:13.02px;font-weight:600;}.ds-health dl{margin:0;}.ds-health dl div{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;}.ds-health dt{color:var(--muted,#667085);font-size:12.04px;}.ds-health dd{margin:0;text-align:right;font-size:12.04px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}.ds-health p{margin:22px 0 0;font-size:12.04px;line-height:1.65;color:var(--muted,#667085);}@media(max-width:700px){.ds-health-heading{padding:20px 16px;}.ds-health-body{padding:20px 16px;}.ds-health dl div{gap:12px;}}"
+    },
+    {
+      "name": "Period presets",
+      "kind": "custom",
+      "refersTo": "period-preset",
+      "description": "Inset reporting-period group with a white selected segment.",
+      "html": "<div class=\"ds-period\" aria-label=\"Reporting period\"><button class=\"ds-selected\" type=\"button\" aria-pressed=\"true\">This month</button><button type=\"button\" aria-pressed=\"false\">Last month</button><button type=\"button\" aria-pressed=\"false\">Quarter</button><button type=\"button\" aria-pressed=\"false\">Year</button><button type=\"button\" aria-pressed=\"false\">Custom</button></div>",
+      "css": ".ds-period{display:flex;padding:3px;border:1px solid var(--line,#e2e6ef);border-radius:8px;background:var(--field,#f6f7fa);}.ds-period button{min-height:34px;padding:7px 13px;border:1px solid transparent;border-radius:5px;background:none;font-size:12.04px;color:var(--secondary,#505c70);white-space:nowrap;cursor:pointer;font-family:\"DM Sans\",sans-serif;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-period button:hover{color:var(--accent,#3556c8);}.ds-period button.ds-selected{background:var(--paper,#ffffff);color:var(--ink,#202735);border-color:var(--line,#e2e6ef);font-weight:600;}.ds-period button:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}@media(max-width:700px){.ds-period{width:100%;justify-content:space-between;}.ds-period button{min-height:36px;padding:8px;}}@media(max-width:374px){.ds-period{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));}.ds-period button{padding-left:3px;padding-right:3px;white-space:normal;line-height:1.35;}}@media(prefers-reduced-motion:reduce){.ds-button,.ds-nav button,.ds-period button,.ds-month{transition:none;}}"
+    },
+    {
+      "name": "Selected chart month",
+      "kind": "custom",
+      "refersTo": "chart-month",
+      "description": "Illustrative chart shapes: cash and in-kind stack beside a separate spending bar.",
+      "html": "<button class=\"ds-month ds-selected\" type=\"button\" aria-label=\"Illustrative month: view records\"><span class=\"ds-pair\"><span class=\"ds-income\"><span class=\"ds-stock-bar\"></span><span class=\"ds-cash-bar\"></span></span><span class=\"ds-spend-bar\"></span></span><span class=\"ds-month-label\">Jan</span></button>",
+      "css": ".ds-month{display:flex;flex-direction:column;align-items:center;width:72px;max-width:72px;height:220px;padding:0 4px;border:0;border-radius:5px;background:none;color:var(--muted,#667085);cursor:pointer;font-family:\"DM Sans\",sans-serif;transition:background-color 160ms ease-out,color 160ms ease-out,border-color 160ms ease-out;}.ds-month.ds-selected{background:var(--field,#f6f7fa);}.ds-month:hover,.ds-month:focus-visible{background:var(--accent-soft,#e9eefc);}.ds-month:focus-visible{outline:2px solid var(--accent,#3556c8);outline-offset:3px;}.ds-pair{display:flex;align-items:flex-end;gap:4px;height:calc(100% - 34px);width:100%;max-width:38px;}.ds-income{display:flex;flex-direction:column;justify-content:flex-end;width:50%;height:100%;border-radius:3px 3px 0 0;overflow:hidden;}.ds-stock-bar{display:block;height:25%;background:var(--stock,#a9b6ec);}.ds-cash-bar{display:block;height:60%;background:var(--cash,#4263d5);}.ds-spend-bar{display:block;width:50%;height:55%;border-radius:3px 3px 0 0;background:var(--outflow,#8792a8);}.ds-month-label{display:flex;align-items:center;justify-content:center;height:34px;font-size:11.06px;color:var(--muted,#667085);}.ds-selected .ds-month-label{color:var(--accent,#3556c8);font-weight:600;}@media(max-width:700px){.ds-month{padding:0 3px;}.ds-pair{gap:3px;}.ds-month-label{font-size:12.04px;}}@media(prefers-reduced-motion:reduce){.ds-button,.ds-nav button,.ds-period button,.ds-month{transition:none;}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Crisp and understated \u2014 white, ink, restrained blue",
+    "overview": "White work surfaces and a cool navigation rail keep attention on amounts, dates, and record decisions. Ink typography, fine rules, and measured spacing establish hierarchy without surrounding every section with a card.\n\nCash, in-kind receipts, and checking spending remain visibly distinct. Unresolved states receive explicit labels and amber treatment; color supports the wording. This system is extracted from `src/ui/style.css` and `src/ui/main.tsx` after the November 12, 2026 finish review. The frontmatter records implemented values.",
+    "keyCharacteristics": [
+      "White workspace, cool pale rail, and restrained blue actions.",
+      "One self-hosted sans family with aligned financial figures.",
+      "Open ruled groups, compact controls, and explicit state labels.",
+      "Responsive records that preserve meaning and readable metadata."
+    ],
+    "rules": [
+      {
+        "name": "The Meaning Before Color Rule",
+        "body": "Pair every financial series and decision color with a label; retain the cash versus in-kind distinction in nearby text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Metadata Rule",
+        "body": "At widths up to (700px), financial chart labels, decision badges, account lines, and amount explanations use at least (0.86rem), approximately (12px). Reflow the content instead of shrinking these labels.",
+        "section": "typography"
+      },
+      {
+        "name": "The Dialog Depth Rule",
+        "body": "Keep ordinary panels and controls flat; use the existing dialog shadow only for modal review and entry surfaces.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the implemented color roles and pair financial colors with explicit labels.",
+      "Do align amounts with tabular numerals and preserve cash, in-kind, and excluded-state wording.",
+      "Do reflow records and filters on mobile while keeping financial metadata at least approximately 12px.",
+      "Do retain visible keyboard focus, accessible control names, and reduced-motion behavior.",
+      "Do use invented, clearly illustrative content in public design previews."
+    ],
+    "donts": [
+      "Don't give ordinary analytical panels the dialog shadow or wrap every metric in a raised card.",
+      "Don't use color alone to imply a record's status or reporting inclusion.",
+      "Don't truncate the selected mobile filter label to preserve a compact header.",
+      "Don't treat synthesized sidecar tonal ramps as implemented application tokens."
+    ]
+  }
+}

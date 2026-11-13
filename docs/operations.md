@@ -25,9 +25,9 @@ into this repository. This milestone does not provision or deploy Cloudflare.
 6. Test anonymous root, static asset and `/api/report`: none may return financial
    data. Verify logged-out, third-party, and both intended identities interactively.
    Verify wrong audience/expired/unsigned JWTs cannot access handlers; ensure no
-   enabled workers.dev or preview URL bypasses the gate. Run CSRF/mutation checks.
+   enabled workers.dev or preview URL bypasses the gate. Verify every dashboard mutation returns 405, even for the owner.
 7. Complete the independent Plaid spike and verify last successful sync for both
-   products, source drilldowns, review conflicts and coverage gaps. Confirm the
+   products, read-only source/history drilldowns and coverage gaps. Confirm the
    runtime calls only the host's Access/Plaid services and contains no ChatGPT
    service dependency. Automatic share-income coverage remains unverified until
    a real incoming receipt is tested.
@@ -76,21 +76,22 @@ is not recovery proof until an isolated restore has passed these checks.
 
 ## Repair
 
-- **Consent/revocation:** sign in as admin, use Data health → Repair Plaid
-  connection. Update mode verifies existing selected account IDs/masks. ID
-  changes require private administrator reconciliation; they are never silently
-  mapped to other accounts. Link authorization and a successful sync are distinct.
+- **Consent/revocation:** use private operator recovery for the owning Item.
+  Hosted repair tooling is pending; the dashboard has no Link or repair controls.
+  Account ID changes require reconciliation and must never silently select a new
+  account. Consent and successful ingestion are separate checks.
 - **Failed sync:** inspect the safe code and last successful product timestamp.
-  Correct the private connection/configuration and request sync; the durable
-  checking cursor has not advanced after a failed batch. Cron also retries.
-- **Changed source after review:** open the record, compare preserved history and
-  current evidence, preview the effect, then create a new decision. Old decisions
-  remain in the audit log.
+  Correct the private configuration through operator tooling and run ingestion;
+  the durable checking cursor does not advance after a failed batch. Configured
+  scheduled runs also retry. Dashboard refresh only reloads saved data.
+- **Changed source after review:** the dashboard shows the preserved history and
+  current evidence. Any correction must use the private operator integration and
+  repository revision checks, preserving the old decision in the audit log.
 - **Oversized initial batch:** no partial totals/cursor are published. Use a
   reviewed staging import/chunked-ingestion extension; do not raise limits blindly.
 - **Historical investment corrections:** the automated overlap is 90 days.
   Explicitly run additional bounded service windows when reconciling older data.
   There is no public backfill/admin-SQL endpoint.
-- **Missing historical price or origin evidence:** leave the receipt in review.
-  Obtain a trustworthy historical close or record a verified manual receipt with
-  its stable provider transaction ID when known. Never use today's quote.
+- **Missing historical price or origin evidence:** leave the receipt excluded.
+  Obtain a trustworthy historical close and verified receipt evidence for private
+  operator ingestion, with the provider ID when known. Never use today's quote.

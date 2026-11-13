@@ -110,6 +110,10 @@ try {
       .replaceAll(keys.clientId, "[redacted client ID]")
       .replaceAll(keys.secret, "[redacted secret]")
       .replace(
+        /https:\/\/secure\.plaid\.com\/hl\/[^\s"'<>]+/gi,
+        "[redacted Hosted Link URL]",
+      )
+      .replace(
         /\b(?:access|public|link)-(?:sandbox|production|development)-[a-z0-9-]+/gi,
         "[redacted Plaid token]",
       );

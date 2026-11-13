@@ -114,7 +114,7 @@ export function demoLedger(now = new Date()): MemoryLedger {
     ...receipt,
     id: "demo-review-stock",
     date: `${current}-01`,
-    description: "EXM · Transfer awaiting evidence",
+    description: "EXM · Share transfer",
     quantity: "12",
     origin: "unknown",
     direction: "unknown",
@@ -124,7 +124,7 @@ export function demoLedger(now = new Date()): MemoryLedger {
     bank(
       "demo-review-bank",
       `${current}-01`,
-      "Brokerage cash movement · verify destination",
+      "Brokerage cash movement · unknown destination",
       -47500,
     ),
   );
@@ -143,6 +143,37 @@ export function demoLedger(now = new Date()): MemoryLedger {
     accounts,
     sources.filter((s) => s.date <= today),
   );
+  // Invented daily balances, independent of synthetic receipt/transaction totals.
+  for (let day = 179; day >= 0; day--) {
+    const capturedAt = new Date(now.getTime() - day * 86_400_000).toISOString();
+    const step = 179 - day;
+    repo.snapshots.push({
+      capturedAt,
+      provider: "Illustrative account balances",
+      accounts: [
+        {
+          accountId: accounts[0].id,
+          currentCents: 1860000 + (step % 30) * 12500 - (step % 7) * 4200,
+          marginLoanCents: 0,
+          currency: "USD",
+          institutionUpdatedAt: capturedAt,
+        },
+        {
+          accountId: accounts[1].id,
+          currentCents:
+            26400000 + step * 21000 + Math.round(Math.sin(step / 8) * 360000),
+          marginLoanCents: 0,
+          currency: "USD",
+          institutionUpdatedAt: capturedAt,
+        },
+      ],
+    });
+  }
+  repo.balanceStatus = {
+    lastAttempt: now.toISOString(),
+    lastSuccess: now.toISOString(),
+    error: null,
+  };
   const priceDate = receipt.date;
   const valuation: Valuation = {
     securityId: receipt.securityId!,
