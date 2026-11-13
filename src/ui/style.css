@@ -263,6 +263,78 @@ label select {
   color: var(--ink);
   font-weight: 500;
 }
+.value-change {
+  margin: 24px 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.value-change-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.value-change-heading p,
+.value-change-amounts dt,
+.value-change-estimate {
+  font-size: 0.86rem;
+  color: var(--secondary);
+}
+.value-change-amounts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0 0 16px;
+}
+.value-change-amounts > div {
+  display: block;
+  min-width: 0;
+}
+.value-change-amounts dt {
+  margin-bottom: 8px;
+}
+.value-change-amounts dd {
+  font-size: 1.7rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  margin: 0 0 4px;
+  text-align: left;
+}
+.value-change-estimate {
+  display: block;
+}
+.value-change-details {
+  margin-top: 16px;
+}
+.value-change-details summary {
+  color: var(--accent);
+  font-size: 0.86rem;
+  cursor: pointer;
+  width: fit-content;
+}
+.value-change-details .help {
+  margin-top: 8px;
+  max-width: 75ch;
+}
+@media (max-width: 700px) {
+  .value-change-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .value-change-amounts {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .value-change-amounts > div + div {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+}
 .balance-plot {
   display: grid;
   grid-template-columns: 104px minmax(0, 1fr);

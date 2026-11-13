@@ -4,6 +4,7 @@ import { z } from "zod";
 import { assertPeriod, pacificToday, periodFor } from "../accounting/dates";
 import { report } from "../accounting/report";
 import { balanceReport } from "../accounting/balances";
+import { accountValueChange } from "../accounting/value-change";
 import { eventId } from "../accounting/types";
 import { D1Ledger } from "../data/d1";
 import { demoLedger } from "../data/demo";
@@ -223,6 +224,13 @@ export function createApp(options: Options = {}) {
       accounts,
       balances: {
         ...balances,
+        change: accountValueChange(
+          balances.history,
+          events,
+          accounts,
+          coverage,
+          period,
+        ),
         history: balances.history.filter(
           (point) => point.date >= period.start && point.date <= period.end,
         ),

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { report } from "../../src/accounting/report";
+import { accountValueChange } from "../../src/accounting/value-change";
+import { balancePoint } from "../../src/accounting/balances";
 
 test("historical ranges change rendered totals and distinguish missing history from zero", async ({
   page,
@@ -548,4 +550,162 @@ test("institution-dated net history includes borrowing once and stays read-only"
   });
   expect(errors).toEqual([]);
   expect(writes).toEqual([]);
+});
+
+test("value change separates net income from estimated investment loss and explains unavailable history", async ({
+  page,
+}) => {
+  const fixture = await (await page.request.get("/api/report")).json();
+  expect(fixture.illustrative).toBe(true);
+  await page.clock.install({ time: new Date("2026-11-12T20:00:00Z") });
+  const points = Array.from({ length: 33 }, (_, i) => {
+    const date = new Date(Date.parse("2026-10-11") + i * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    return balancePoint(
+      {
+        capturedAt: date + "T20:00:00Z",
+        asOfDate: date,
+        provider: "Invented account values",
+        historyMethods: ["institution_export"],
+        accounts: fixture.accounts.map((a: { id: string }, index: number) => ({
+          accountId: a.id,
+          currentCents: null,
+          netValueCents:
+            index === 0 ? 100000 : 900000 + Math.round((i * 50000) / 32),
+          marginLoanCents: null,
+          currency: "USD",
+          institutionUpdatedAt: null,
+        })),
+      },
+      fixture.accounts,
+    );
+  });
+  const sample = fixture.records.find(
+    (e: { kind: string }) => e.kind === "cash_income",
+  );
+  const events = [
+    {
+      ...sample,
+      id: "invented-cash",
+      date: "2026-10-12",
+      kind: "cash_income",
+      status: "confirmed",
+      amountCents: 100000,
+    },
+    {
+      ...sample,
+      id: "invented-shares",
+      date: "2026-10-20",
+      kind: "stock_income",
+      status: "confirmed",
+      amountCents: 20000,
+    },
+    {
+      ...sample,
+      id: "invented-spending",
+      date: "2026-11-01",
+      kind: "spending",
+      status: "confirmed",
+      amountCents: 30000,
+    },
+  ];
+  let missingHistory = false;
+  await page.route("**/api/report*", (route) => {
+    const url = new URL(route.request().url()),
+      period = {
+        start: url.searchParams.get("start")!,
+        end: url.searchParams.get("end")!,
+      };
+    const coverage = fixture.coverage.map((c: object) => ({
+      ...c,
+      history: missingHistory
+        ? undefined
+        : {
+            start: "2026-01-01",
+            end: "2026-11-12",
+            source: "Invented activity",
+            retrievedAt: "2026-11-12T20:00:00Z",
+          },
+    }));
+    const result = report(events, period);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...fixture,
+        ...result,
+        trend: result.months,
+        coverage,
+        availablePeriod: { start: "2026-01-01", end: "2026-11-12" },
+        balances: {
+          ...fixture.balances,
+          latest: points.at(-1),
+          stale: false,
+          history: points.filter(
+            (p) => p.date >= period.start && p.date <= period.end,
+          ),
+          change: accountValueChange(
+            points,
+            events,
+            fixture.accounts,
+            coverage,
+            period,
+          ),
+        },
+      }),
+    });
+  });
+  const writes: string[] = [],
+    errors: string[] = [];
+  page.on("request", (r) => {
+    if (!["GET", "HEAD"].includes(r.method())) writes.push(r.method());
+  });
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  const group = page.getByRole("group", {
+    name: "Account value change breakdown",
+  });
+  const amounts = group.locator(".value-change-amounts > div");
+  await expect(amounts.nth(0).locator("dd")).toHaveText("+$500.00");
+  await expect(amounts.nth(1).locator("dd")).toContainText("+$900.00");
+  await expect(amounts.nth(1)).toContainText(
+    "$1,200.00 income − $300.00 expenses",
+  );
+  await expect(amounts.nth(2).locator("dd")).toContainText("-$400.00");
+  await group.getByText("How this is calculated", { exact: true }).click();
+  await expect(
+    group.getByText(/not a rate of return or taxable gain/),
+  ).toBeVisible();
+  await expect(group.getByText(/Oct 11, 2026 to/)).toBeVisible();
+  await expect(page.locator(".balance-total")).toHaveText("$10,500.00");
+  await page
+    .locator(".account-value")
+    .screenshot({
+      path: `test-results/value-change-${test.info().project.name}.png`,
+    });
+  await page.getByRole("tab", { name: "Year to date", exact: true }).click();
+  await expect(
+    group.getByText(/covers part of the selected period/),
+  ).toBeVisible();
+  await expect(amounts.nth(0).locator("dd")).toHaveText("+$500.00");
+  await page.getByRole("tab", { name: "Last year", exact: true }).click();
+  await expect(group.getByText(/Two dated net account values/)).toBeVisible();
+  await expect(page.locator(".balance-total")).toHaveText("$10,500.00");
+  await page.getByRole("tab", { name: "Last 1 month", exact: true }).click();
+  missingHistory = true;
+  await page.reload();
+  await expect(amounts.nth(0).locator("dd")).toHaveText("+$500.00");
+  await expect(amounts.nth(1).locator("dd")).toHaveText("Unavailable");
+  await expect(amounts.nth(2).locator("dd")).toContainText("Unavailable");
+  await expect(
+    group.getByText(/Transaction history for both accounts is needed/),
+  ).toBeVisible();
+  expect(writes).toEqual([]);
+  expect(errors).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
 });

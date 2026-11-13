@@ -143,6 +143,17 @@ Private operator tooling retains raw price responses, replayed positions,
 statement comparisons and evidence hashes; there is no browser import control
 or new background price job.
 
+The balance view also explains the selected period's change as **income minus
+expenses plus estimated investment gain/loss**. It compares net values using the
+previous day's balance when available, includes flows after the opening value
+through the ending date, and names any shorter comparison window. External cash
+and shares use their existing recorded valuations; internal transfers stay
+excluded. The investment figure is a dollar residual that includes dividends,
+interest, fees and valuation/timing differences, not a performance rate or taxable
+gain. Missing transaction windows or unresolved external flows leave the split
+unavailable rather than attributing unexplained movement to investments. This
+read-only calculation changes no source record, saved balance or income total.
+
 ## Status and the real-data feasibility gate
 
 The first implementation milestone provides the accounting backend, synthetic

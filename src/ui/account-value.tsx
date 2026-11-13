@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import type { BalancePoint, BalanceReport } from "../accounting/balances";
 import type { Account } from "../accounting/types";
 import { displayDate, money } from "./api";
+import { ValueChangeBreakdown } from "./value-change";
 
 const timestamp = (value: string) =>
   new Date(value).toLocaleString("en-US", {
@@ -57,13 +58,14 @@ export function AccountValue({
   const first = history[0],
     last = history.at(-1);
   const change =
-    first &&
+    data.change?.changeCents ??
+    (first &&
     last &&
     value(first) !== null &&
     value(last) !== null &&
     history.length > 1
       ? value(last)! - value(first)!
-      : null;
+      : null);
   const available = history.filter((p) => value(p) !== null);
   const low = Math.min(...available.map((p) => value(p)!));
   const high = Math.max(...available.map((p) => value(p)!));
@@ -190,7 +192,9 @@ export function AccountValue({
                     {change > 0 ? "+" : ""}
                     {money(change)}
                   </strong>{" "}
-                  across {history.length} saved days
+                  {data.change?.changeCents !== null && data.change
+                    ? "change over compared dates"
+                    : `across ${history.length} saved days`}
                 </>
               ) : (
                 "Selected reporting period"
@@ -324,12 +328,13 @@ export function AccountValue({
                 </label>
               ) : history.length === 1 ? (
                 <p className="help">
-                  First daily value saved. Another day’s value will start the
-                  trend.
+                  One saved value in this period. Choose a longer range to see
+                  the trend.
                 </p>
               ) : null}
             </>
           )}
+          <ValueChangeBreakdown data={data.change ?? null} />
           <p className="balance-method">
             {net ? "Net worth" : "Account value"} for these two accounts only.
             {net ? " Brokerage values include borrowing." : ""} Changes include

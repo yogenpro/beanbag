@@ -130,3 +130,15 @@ Use only the loopback illustrative repository. Build before browser checks,
 exercise all three views and read-only record details, inspect desktop/mobile
 screenshots, and run the Impeccable detector once. Finish with a visual review of
 the changed flows. No shipping raster assets are planned.
+
+Account-value attribution extension: preserve the existing balance chart and add
+an open ruled change breakdown below its date selector. Show total change,
+income less expenses, and an explicitly estimated investment gain/loss. Match
+the balances and flow dates, expose any shorter period and explain the residual
+in a native details element. Missing history and unresolved flows show unavailable
+amounts. Use the existing secondary amount treatment at 1.7rem, the current
+palette and tabular figures; stack the groups on mobile without introducing
+cards or new controls. The detector's advisory about this existing size is a
+documentation-ramp gap, not a new visual direction. Preserve the accepted design
+artifacts. Desktop/mobile checks cover the equation, a loss despite growing
+account value, period changes, missing history and no write requests.

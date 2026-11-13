@@ -224,6 +224,7 @@ export async function main(
             period,
             new Date(),
             await store.repo.accountValueHistory(),
+            { events, coverage: await store.repo.coverage() },
           ),
           sourceEvidence: (
             await store.db
