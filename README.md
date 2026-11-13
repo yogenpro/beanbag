@@ -84,6 +84,14 @@ complete calendar year. Max covers all saved dates, including imported history.
 All charts and totals follow the selected period; the latest account value stays
 independent of it.
 
+Balance history and transaction history have separate coverage. Historical daily
+account values do not create income or expense records. A private operator can
+backfill missing provider-ID transactions using an authorized Assets report for
+checking and investment transaction history for brokerage. Existing IDs, source
+records, receipt valuations and cursors stay intact. The UI shows loaded
+transaction dates, flags partial periods and withholds empty totals outside known
+history. Loaded provider windows do not establish independently complete records.
+
 Every total has a source drilldown. Review decisions include rationale, reviewer,
 timestamp and source revision. A provider correction preserves the decision and
 raises a review conflict. Sources and classification remain separate. Normal

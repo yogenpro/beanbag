@@ -640,6 +640,9 @@ main:focus {
   gap: 12px;
   margin-bottom: 24px;
 }
+.transaction-history {
+  margin-bottom: 24px;
+}
 .period-presets {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

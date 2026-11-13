@@ -338,34 +338,60 @@ export function transferMatches(
   const transfers = sources.filter(
     (s) => ids.has(s.accountId) && transferCandidate(s),
   );
-  const mask = (source: Source) =>
-    source.description.match(
-      /(?:checking|brokerage).*?(?:[-…*]|ending(?:\s+in)?\s+)(\d{4})\b/i,
-    )?.[1];
+  // Dates and counterpart masks are immutable during a classification pass.
+  // Parsing them for every pair makes larger historical imports needlessly slow.
+  const metadata = new Map(
+    transfers.map((source) => [
+      source,
+      {
+        day: validDate(source.date)
+          ? Date.parse(source.date + "T12:00:00Z")
+          : null,
+        mask: source.description.match(
+          /(?:checking|brokerage).*?(?:[-…*]|ending(?:\s+in)?\s+)(\d{4})\b/i,
+        )?.[1],
+      },
+    ]),
+  );
+  const selected = new Map(accounts.map((account) => [account.id, account]));
+  const byDay = new Map<number, Source[]>();
+  for (const source of transfers) {
+    const day = metadata.get(source)!.day;
+    if (day !== null) {
+      const bucket = byDay.get(day) ?? [];
+      bucket.push(source);
+      byDay.set(day, bucket);
+    }
+  }
   const candidates = new Map<string, string[]>();
   for (const source of transfers) {
-    const matches = transfers.filter(
-      (other) =>
+    const left = metadata.get(source)!;
+    const nearby =
+      left.day === null
+        ? []
+        : [-3, -2, -1, 0, 1, 2, 3].flatMap(
+            (offset) => byDay.get(left.day! + offset * 86_400_000) ?? [],
+          );
+    const matches = nearby.filter((other) => {
+      const right = metadata.get(other)!;
+      return (
         other.accountId !== source.accountId &&
         source.currency === other.currency &&
-        validDate(source.date) &&
-        validDate(other.date) &&
-        daysApart(source.date, other.date) <= 3 &&
+        left.day !== null &&
+        right.day !== null &&
+        Math.abs(left.day - right.day) <= 3 * 86_400_000 &&
         (!source.counterpartAccountId ||
           source.counterpartAccountId === other.accountId) &&
         (!other.counterpartAccountId ||
           other.counterpartAccountId === source.accountId) &&
-        (!mask(source) ||
-          mask(source) ===
-            accounts.find((a) => a.id === other.accountId)?.mask) &&
-        (!mask(other) ||
-          mask(other) ===
-            accounts.find((a) => a.id === source.accountId)?.mask) &&
+        (!left.mask || left.mask === selected.get(other.accountId)?.mask) &&
+        (!right.mask || right.mask === selected.get(source.accountId)?.mask) &&
         (!source.transferReference ||
           !other.transferReference ||
           source.transferReference === other.transferReference) &&
-        oppositeMovement(source, other),
-    );
+        oppositeMovement(source, other)
+      );
+    });
     candidates.set(eventId(source), matches.map(eventId));
   }
   const result = new Map<string, string>();

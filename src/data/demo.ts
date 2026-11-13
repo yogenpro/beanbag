@@ -226,7 +226,13 @@ export function demoLedger(now = new Date()): MemoryLedger {
     lastSuccess: now.toISOString(),
     lastAttempt: now.toISOString(),
     mostRecentDate: today,
-    startDate: sources[0].date,
+    startDate: sources.map((source) => source.date).sort()[0],
+    history: {
+      start: sources.map((source) => source.date).sort()[0],
+      end: today,
+      source: "Illustrative transaction history",
+      retrievedAt: now.toISOString(),
+    },
     limitation:
       "Illustrative data only. No bank is connected; freshness timestamps are simulated.",
   }));

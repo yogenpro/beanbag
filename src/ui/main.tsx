@@ -19,6 +19,7 @@ import {
 import { PeriodPicker } from "./period-picker";
 import { periodOptions, type RangeSelection } from "./periods";
 import type { Period } from "../accounting/dates";
+import { transactionCoverage } from "../accounting/coverage";
 import type { EventKind, FinancialEvent } from "../accounting/types";
 import { api, money, displayDate, type Dashboard, type Detail } from "./api";
 import { AccountValue } from "./account-value";
@@ -592,6 +593,12 @@ function Health({
                 </dd>
               </div>
             </dl>
+            {h.history && (
+              <p className="help">
+                Loaded transactions: {displayDate(h.history.start)} —{" "}
+                {displayDate(h.history.end)}.
+              </p>
+            )}
             <p className="help">{h.limitation}</p>
             {h.error && (
               <p className="error">Sync needs attention: {h.error}</p>
@@ -682,6 +689,8 @@ function App() {
     }
   }
   const totals = data?.totals;
+  const history = transactionCoverage(data?.coverage ?? [], period);
+  const showFlows = history.status === "available" || !!data?.records.length;
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -822,181 +831,225 @@ function App() {
                   <div className="section-heading">
                     <h2>Confirmed totals</h2>
                     <span
-                      className={`status ${data.review.count ? "review" : ""}`}
+                      className={`status ${data.review.count || history.status !== "available" ? "review" : ""}`}
                     >
-                      {data.review.count
-                        ? "Incomplete entries excluded"
-                        : "Confirmed records"}
+                      {!showFlows
+                        ? "History unavailable"
+                        : history.status === "partial"
+                          ? "Partial period"
+                          : history.status === "unknown"
+                            ? "Saved records"
+                            : data.review.count
+                              ? "Incomplete entries excluded"
+                              : "Confirmed records"}
                     </span>
                   </div>
-                  {data.review.count > 0 && (
-                    <div className="excluded-note">
-                      <CircleAlert size={16} aria-hidden="true" />
+                  <p
+                    className={`transaction-history ${history.status === "partial" || history.status === "unknown" ? "balance-warning" : "help"}`}
+                  >
+                    {history.start &&
+                    history.end &&
+                    history.start <= history.end ? (
+                      <>
+                        {history.status === "available"
+                          ? "Transaction history loaded for both accounts: "
+                          : "Loaded transaction history for both accounts: "}
+                        {displayDate(history.start)} —{" "}
+                        {displayDate(history.end)}.
+                        {history.status === "partial" &&
+                          " This range extends beyond that history; totals use only available records."}
+                      </>
+                    ) : (
+                      "Transaction-history coverage is not recorded for both accounts. Totals use saved records only."
+                    )}
+                  </p>
+                  {!showFlows ? (
+                    <div className="balance-empty">
+                      <h3>
+                        {history.status === "unavailable"
+                          ? "No transaction history for this period"
+                          : "Full-period totals unavailable"}
+                      </h3>
                       <p>
-                        {data.review.count}{" "}
-                        {data.review.count === 1 ? "entry is" : "entries are"}{" "}
-                        excluded from income and spending because classification
-                        or valuation is incomplete.
+                        Choose a period with loaded transactions to view income
+                        and expenses.
                       </p>
-                      <button
-                        className="text-button"
-                        onClick={() => drill("unclassified")}
-                      >
-                        View entries <ArrowRight size={15} />
-                      </button>
                     </div>
-                  )}
-                  <div className="summary-grid">
-                    <section className="income-summary">
-                      <button
-                        className="hero-metric"
-                        aria-label="View total recorded income records"
-                        onClick={() => drill("income")}
-                      >
-                        <span>
-                          Total recorded income <ArrowUpRight size={18} />
-                        </span>
-                        <strong>{money(totals.totalIncome)}</strong>
-                      </button>
-                      <div className="income-parts">
-                        <button onClick={() => drill("cash_income")}>
-                          <i className="cash-dot" />
-                          <span>
-                            Cash income<small>Received by either account</small>
-                          </span>
-                          <strong>{money(totals.cashIncome)}</strong>
-                        </button>
-                        <button onClick={() => drill("stock_income")}>
-                          <i className="stock-dot" />
-                          <span>
-                            Incoming stock transfers
-                            <small>Valued in-kind · not cash</small>
-                          </span>
-                          <strong>{money(totals.stockIncome)}</strong>
-                        </button>
-                      </div>
-                    </section>
-                    <section className="spending-summary">
-                      <button
-                        className="hero-metric"
-                        aria-label="View total expense records"
-                        onClick={() => drill("expenses")}
-                      >
-                        <span>
-                          Total expenses <ArrowUpRight size={18} />
-                        </span>
-                        <strong>{money(totals.spending)}</strong>
-                      </button>
-                      <p>
-                        Cash and shares leaving either account.
-                        <br />
-                        Credit-card payments count when paid.
-                      </p>
-                      {totals.stockSpending > 0 && (
-                        <p className="help">
-                          Cash payments {money(totals.cashSpending)} · Share
-                          transfers {money(totals.stockSpending)}
-                        </p>
-                      )}
-                      <button
-                        className="text-button"
-                        onClick={() => drill("expenses")}
-                      >
-                        Explore expenses <ArrowRight size={15} />
-                      </button>
-                    </section>
-                  </div>
-                  <div className="flow-strip">
-                    <Metric
-                      label="Net cash flow"
-                      amount={totals.netCashFlow}
-                      note="Cash income − cash payments"
-                      onClick={() => drill("net_cash")}
-                    />
-                    <Metric
-                      label="Net recorded inflow"
-                      amount={totals.netRecordedFlow}
-                      note="Total income − total expenses"
-                      onClick={() => drill("net_recorded")}
-                      tone="recorded"
-                    />
-                    <button
-                      className="boundary-metric"
-                      aria-label="View excluded internal transfers records"
-                      onClick={() => drill("internal_transfer")}
-                    >
-                      <span className="metric-label">
-                        Excluded internal transfers
-                        <ArrowUpRight size={15} />
-                      </span>
-                      <strong>{money(totals.internalTransfers)}</strong>
-                      <span className="boundary-route">
-                        Checking <ArrowLeftRight size={14} /> Brokerage
-                      </span>
-                      <span className="metric-note">
-                        Movement inside your two-account boundary
-                      </span>
-                    </button>
-                  </div>
-                  <div className="middle-grid">
-                    <Trend
-                      data={data}
-                      select={(month) => {
-                        setSelection({ tab: "month", value: month });
-                        setFilter("all");
-                        setTab("activity");
-                      }}
-                    />
-                    <section className="panel breakdown">
-                      <div className="panel-heading">
-                        <div>
-                          <h2>Expense breakdown</h2>
+                  ) : (
+                    <>
+                      {data.review.count > 0 && (
+                        <div className="excluded-note">
+                          <CircleAlert size={16} aria-hidden="true" />
+                          <p>
+                            {data.review.count}{" "}
+                            {data.review.count === 1
+                              ? "entry is"
+                              : "entries are"}{" "}
+                            excluded from income and spending because
+                            classification or valuation is incomplete.
+                          </p>
+                          <button
+                            className="text-button"
+                            onClick={() => drill("unclassified")}
+                          >
+                            View entries <ArrowRight size={15} />
+                          </button>
                         </div>
-                      </div>
-                      {data.breakdown.filter((b) =>
-                        ["spending", "stock_spending"].includes(b.kind),
-                      ).length ? (
-                        data.breakdown
-                          .filter((b) =>
-                            ["spending", "stock_spending"].includes(b.kind),
-                          )
-                          .sort((a, b) => b.amountCents - a.amountCents)
-                          .map((b) => (
-                            <button
-                              className="breakdown-row"
-                              key={`${b.kind}:${b.category}`}
-                              onClick={() => drill(b.kind as EventKind)}
-                            >
-                              <span>{b.category}</span>
-                              <strong>{money(b.amountCents)}</strong>
-                              <span className="breakdown-track">
-                                <span
-                                  style={{
-                                    width: `${totals.spending ? (b.amountCents / totals.spending) * 100 : 0}%`,
-                                  }}
-                                />
-                              </span>
-                            </button>
-                          ))
-                      ) : (
-                        <p className="help">
-                          No confirmed spending in this period.
-                        </p>
                       )}
-                      <p className="help">
-                        Cash and share transfers leaving the tracked pair.
-                      </p>
-                    </section>
-                  </div>
-                  <Records
-                    records={data.records}
-                    accounts={data.accounts}
-                    filter={filter}
-                    setFilter={setFilter}
-                    open={(e) => void open(e)}
-                    compact
-                    viewAll={() => drill(filter)}
-                  />
+                      <div className="summary-grid">
+                        <section className="income-summary">
+                          <button
+                            className="hero-metric"
+                            aria-label="View total recorded income records"
+                            onClick={() => drill("income")}
+                          >
+                            <span>
+                              Total recorded income <ArrowUpRight size={18} />
+                            </span>
+                            <strong>{money(totals.totalIncome)}</strong>
+                          </button>
+                          <div className="income-parts">
+                            <button onClick={() => drill("cash_income")}>
+                              <i className="cash-dot" />
+                              <span>
+                                Cash income
+                                <small>Received by either account</small>
+                              </span>
+                              <strong>{money(totals.cashIncome)}</strong>
+                            </button>
+                            <button onClick={() => drill("stock_income")}>
+                              <i className="stock-dot" />
+                              <span>
+                                Incoming stock transfers
+                                <small>Valued in-kind · not cash</small>
+                              </span>
+                              <strong>{money(totals.stockIncome)}</strong>
+                            </button>
+                          </div>
+                        </section>
+                        <section className="spending-summary">
+                          <button
+                            className="hero-metric"
+                            aria-label="View total expense records"
+                            onClick={() => drill("expenses")}
+                          >
+                            <span>
+                              Total expenses <ArrowUpRight size={18} />
+                            </span>
+                            <strong>{money(totals.spending)}</strong>
+                          </button>
+                          <p>
+                            Cash and shares leaving either account.
+                            <br />
+                            Credit-card payments count when paid.
+                          </p>
+                          {totals.stockSpending > 0 && (
+                            <p className="help">
+                              Cash payments {money(totals.cashSpending)} · Share
+                              transfers {money(totals.stockSpending)}
+                            </p>
+                          )}
+                          <button
+                            className="text-button"
+                            onClick={() => drill("expenses")}
+                          >
+                            Explore expenses <ArrowRight size={15} />
+                          </button>
+                        </section>
+                      </div>
+                      <div className="flow-strip">
+                        <Metric
+                          label="Net cash flow"
+                          amount={totals.netCashFlow}
+                          note="Cash income − cash payments"
+                          onClick={() => drill("net_cash")}
+                        />
+                        <Metric
+                          label="Net recorded inflow"
+                          amount={totals.netRecordedFlow}
+                          note="Total income − total expenses"
+                          onClick={() => drill("net_recorded")}
+                          tone="recorded"
+                        />
+                        <button
+                          className="boundary-metric"
+                          aria-label="View excluded internal transfers records"
+                          onClick={() => drill("internal_transfer")}
+                        >
+                          <span className="metric-label">
+                            Excluded internal transfers
+                            <ArrowUpRight size={15} />
+                          </span>
+                          <strong>{money(totals.internalTransfers)}</strong>
+                          <span className="boundary-route">
+                            Checking <ArrowLeftRight size={14} /> Brokerage
+                          </span>
+                          <span className="metric-note">
+                            Movement inside your two-account boundary
+                          </span>
+                        </button>
+                      </div>
+                      <div className="middle-grid">
+                        <Trend
+                          data={data}
+                          select={(month) => {
+                            setSelection({ tab: "month", value: month });
+                            setFilter("all");
+                            setTab("activity");
+                          }}
+                        />
+                        <section className="panel breakdown">
+                          <div className="panel-heading">
+                            <div>
+                              <h2>Expense breakdown</h2>
+                            </div>
+                          </div>
+                          {data.breakdown.filter((b) =>
+                            ["spending", "stock_spending"].includes(b.kind),
+                          ).length ? (
+                            data.breakdown
+                              .filter((b) =>
+                                ["spending", "stock_spending"].includes(b.kind),
+                              )
+                              .sort((a, b) => b.amountCents - a.amountCents)
+                              .map((b) => (
+                                <button
+                                  className="breakdown-row"
+                                  key={`${b.kind}:${b.category}`}
+                                  onClick={() => drill(b.kind as EventKind)}
+                                >
+                                  <span>{b.category}</span>
+                                  <strong>{money(b.amountCents)}</strong>
+                                  <span className="breakdown-track">
+                                    <span
+                                      style={{
+                                        width: `${totals.spending ? (b.amountCents / totals.spending) * 100 : 0}%`,
+                                      }}
+                                    />
+                                  </span>
+                                </button>
+                              ))
+                          ) : (
+                            <p className="help">
+                              No confirmed spending in this period.
+                            </p>
+                          )}
+                          <p className="help">
+                            Cash and share transfers leaving the tracked pair.
+                          </p>
+                        </section>
+                      </div>
+                      <Records
+                        records={data.records}
+                        accounts={data.accounts}
+                        filter={filter}
+                        setFilter={setFilter}
+                        open={(e) => void open(e)}
+                        compact
+                        viewAll={() => drill(filter)}
+                      />
+                    </>
+                  )}
                   <button
                     className="coverage-link"
                     onClick={() => setTab("health")}
