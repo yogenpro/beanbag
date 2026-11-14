@@ -880,25 +880,14 @@ function App() {
                               : "Confirmed records"}
                     </span>
                   </div>
-                  <p
-                    className={`transaction-history ${history.status === "partial" || history.status === "unknown" ? "balance-warning" : "help"}`}
-                  >
-                    {history.start &&
-                    history.end &&
-                    history.start <= history.end ? (
-                      <>
-                        {history.status === "available"
-                          ? "Transaction history loaded for both accounts: "
-                          : "Loaded transaction history for both accounts: "}
-                        {displayDate(history.start)} —{" "}
-                        {displayDate(history.end)}.
-                        {history.status === "partial" &&
-                          " This range extends beyond that history; totals use only available records."}
-                      </>
-                    ) : (
-                      "Transaction-history coverage is not recorded for both accounts. Totals use saved records only."
-                    )}
-                  </p>
+                  {(history.status === "partial" ||
+                    history.status === "unknown") && (
+                    <p className="transaction-history balance-warning">
+                      {history.status === "partial"
+                        ? "The selected period extends beyond loaded transaction history; totals use only available records."
+                        : "Transaction-history coverage is not recorded for both accounts. Totals use saved records only."}
+                    </p>
+                  )}
                   {!showFlows ? (
                     <div className="balance-empty">
                       <h3>
