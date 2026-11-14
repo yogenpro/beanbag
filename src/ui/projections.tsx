@@ -5,8 +5,8 @@ import {
   assumptionLimits,
   calibrateProjection,
   projectAccountValue,
-  projectedCashFlow,
-  scaledContributionDeviation,
+  projectIncome,
+  projectedMonthlyFlows,
   type ProjectionAssumptions,
   type ProjectionPoint,
   type ProjectionLookback,
@@ -19,7 +19,7 @@ export type ProjectionSettings = {
   overrides: Partial<Record<keyof ProjectionAssumptions, string>>;
 };
 export const initialProjectionSettings: ProjectionSettings = {
-  lookback: 12,
+  lookback: "max",
   years: 10,
   confidence: 80,
   overrides: {},
@@ -44,51 +44,61 @@ const fields: ProjectionField[] = [
     key: "cashIncome",
     label: "Monthly cash income",
     unit: "$ / month",
-    help: "Average external cash received before scaling.",
+    help: "Recent average external cash receipts at the start of the forecast.",
   },
   {
-    key: "incomeScale",
-    label: "Cash income scale",
-    unit: "% of baseline",
-    help: "100% keeps the monthly baseline; 120% increases it by 20%.",
-    defaultLabel: "Unscaled baseline",
+    key: "stockIncome",
+    label: "Monthly stock income",
+    unit: "$ / month",
+    help: "Incoming external shares at their saved transfer values, before any outflows.",
+  },
+  {
+    key: "incomeGrowth",
+    label: "Annual income growth",
+    unit: "% / year",
+    help: "Compounds cash and stock income every year. 5% means 1.05× after one year, 1.1025× after two.",
+  },
+  {
+    key: "incomeVolatility",
+    label: "Annual income uncertainty",
+    unit: "% log growth",
+    help: "Historical variation in year-over-year income growth; controls the income outcome band.",
   },
   {
     key: "cashPayments",
     label: "Monthly cash payments",
     unit: "$ / month",
-    help: "Average external cash paid, entered as a positive amount.",
+    help: "Recent average external cash payments, entered as a positive amount.",
   },
   {
-    key: "paymentScale",
-    label: "Cash payments scale",
-    unit: "% of baseline",
-    help: "100% keeps the monthly baseline; 80% reduces it by 20%.",
-    defaultLabel: "Unscaled baseline",
-  },
-  {
-    key: "shares",
-    label: "Monthly net share transfers",
+    key: "stockPayments",
+    label: "Monthly stock outflows",
     unit: "$ / month",
-    help: "Incoming minus outgoing shares at recorded transfer values.",
+    help: "Outgoing external shares at saved transfer values; treated as expenses.",
+  },
+  {
+    key: "paymentGrowth",
+    label: "Annual payment growth",
+    unit: "% / year",
+    help: "Compounds cash payments and stock outflows separately from income.",
+  },
+  {
+    key: "paymentVolatility",
+    label: "Annual payment uncertainty",
+    unit: "% log growth",
+    help: "Historical variation in year-over-year external expenses.",
   },
   {
     key: "growth",
     label: "Annual investment growth",
     unit: "% / year",
-    help: "Geometric growth of the combined accounts, after external flows.",
+    help: "Geometric growth of account value after external flows; independent of income growth.",
   },
   {
     key: "volatility",
     label: "Annual return volatility",
     unit: "% / year",
-    help: "Standard deviation of log returns; controls market uncertainty.",
-  },
-  {
-    key: "flowDeviation",
-    label: "Monthly contribution variability",
-    unit: "$ / month",
-    help: "Recomputed from scaled monthly history unless you enter your own value.",
+    help: "Standard deviation of investment log returns; controls market uncertainty.",
   },
 ];
 
@@ -149,9 +159,11 @@ function AssumptionField({
 function ProjectionChart({
   points,
   confidence,
+  metric = "account value",
 }: {
   points: ProjectionPoint[];
   confidence: number;
+  metric?: "account value" | "monthly income";
 }) {
   const [month, setMonth] = useState(points.length - 1);
   const chart = useRef<HTMLDivElement>(null);
@@ -201,7 +213,8 @@ function ProjectionChart({
       <div className="projection-readout" aria-live="polite" aria-atomic="true">
         <span>{displayDate(selected.date)}</span>
         <strong>
-          {amount(selected.median)} <span>median</span>
+          {amount(selected.median)}{" "}
+          <span>median{metric === "monthly income" ? " / month" : ""}</span>
         </strong>
         <span>
           {confidence}% range: {amount(selected.lower)} to{" "}
@@ -212,7 +225,7 @@ function ProjectionChart({
         <svg
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={`Projected account value with a ${confidence}% modeled outcome range`}
+          aria-label={`Projected ${metric} with a ${confidence}% modeled outcome range`}
           onPointerMove={(event) => {
             const bounds = event.currentTarget.getBoundingClientRect();
             const position =
@@ -231,7 +244,7 @@ function ProjectionChart({
             );
           }}
         >
-          <title>Future tracked account value</title>
+          <title>Future {metric}</title>
           <desc>
             A solid line shows the median of 1,000 simulated paths. The shaded
             area shows the central {confidence}% of outcomes at each month. Use
@@ -324,6 +337,7 @@ export function Projections({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  const [view, setView] = useState<"value" | "income">("value");
   const anchor = data.balances.latest?.date;
   const captured = data.balances.latest?.capturedAt;
   useEffect(() => {
@@ -359,13 +373,7 @@ export function Projections({
   );
   const resolved = {} as ProjectionAssumptions;
   const historicalValue = (key: keyof ProjectionAssumptions) =>
-    key === "flowDeviation"
-      ? scaledContributionDeviation(
-          calibration,
-          resolved.incomeScale,
-          resolved.paymentScale,
-        )
-      : calibration?.defaults[key];
+    calibration?.defaults[key];
   const invalid: string[] = [];
   for (const field of fields) {
     const override = settings.overrides[field.key];
@@ -385,9 +393,18 @@ export function Projections({
       !Number.isFinite(value) ||
       value < min ||
       value > max
-    )
-      invalid.push(field.label);
-    else resolved[field.key] = value;
+    ) {
+      if (
+        view === "value" ||
+        [
+          "cashIncome",
+          "stockIncome",
+          "incomeGrowth",
+          "incomeVolatility",
+        ].includes(field.key)
+      )
+        invalid.push(field.label);
+    } else resolved[field.key] = value;
   }
   const latest = history?.balances.latest ?? data.balances.latest;
   const startCents = latest?.netWorthCents;
@@ -400,6 +417,13 @@ export function Projections({
     )
       return null;
     try {
+      if (view === "income")
+        return projectIncome(
+          latest.date,
+          settings.years,
+          resolved,
+          settings.confidence,
+        );
       return projectAccountValue(
         startCents,
         latest.date,
@@ -415,6 +439,7 @@ export function Projections({
     startCents,
     settings.years,
     settings.confidence,
+    view,
     ...fields.map((field) => resolved[field.key]),
   ]);
   const update = (patch: Partial<ProjectionSettings>) =>
@@ -446,13 +471,17 @@ export function Projections({
       </section>
     );
   const forecast = scenario && !("error" in scenario) ? scenario : null;
-  const end = forecast?.points.at(-1);
+  const chartPoints =
+    view === "income" ? forecast?.incomePoints : forecast?.points;
+  const end = chartPoints?.at(-1);
+  const baselineFlows = projectedMonthlyFlows(resolved, 0);
+  const firstYear = projectedMonthlyFlows(resolved, 12);
   const shortHistory =
     Math.min(
       calibration?.flowMonths.length ?? 0,
       calibration?.returnMonths.length ?? 0,
     ) < 12;
-  const cashFlow = projectedCashFlow(resolved);
+
   const renderField = (field: ProjectionField) => (
     <AssumptionField
       key={field.key}
@@ -529,22 +558,57 @@ export function Projections({
       >
         <div className="panel-heading">
           <div>
-            <h2 id="projection-heading">Where your accounts could go</h2>
+            <h2 id="projection-heading">
+              {view === "income"
+                ? "How your income could grow"
+                : "Where your accounts could go"}
+            </h2>
             <p>
-              Checking + brokerage, net of borrowing · nominal future dollars,
-              without inflation adjustment.
+              {view === "income"
+                ? "Cash receipts + incoming stock transfers · monthly run rate"
+                : "Checking + brokerage, net of borrowing"}{" "}
+              · nominal future dollars, without inflation adjustment.
             </p>
           </div>
         </div>
+        <div
+          className="projection-view-switch"
+          role="group"
+          aria-label="Projection graph"
+        >
+          <button
+            className="button"
+            aria-pressed={view === "value"}
+            onClick={() => setView("value")}
+          >
+            Account value
+          </button>
+          <button
+            className="button"
+            aria-pressed={view === "income"}
+            onClick={() => setView("income")}
+          >
+            Monthly income
+          </button>
+        </div>
         <dl className="projection-summary">
           <div>
-            <dt>Starting value · {displayDate(latest.date)}</dt>
-            <dd>{money(startCents)}</dd>
+            <dt>
+              {view === "income" ? "Starting monthly income" : "Starting value"}{" "}
+              · {displayDate(latest.date)}
+            </dt>
+            <dd>
+              {view === "income"
+                ? Number.isFinite(baselineFlows.income)
+                  ? amount(baselineFlows.income)
+                  : "—"
+                : money(startCents)}
+            </dd>
           </div>
           <div>
             <dt>
-              Median after {settings.years}{" "}
-              {settings.years === 1 ? "year" : "years"}
+              {view === "income" ? "Monthly median" : "Median"} after{" "}
+              {settings.years} {settings.years === 1 ? "year" : "years"}
             </dt>
             <dd data-testid="projection-end">
               {end ? amount(end.median) : "—"}
@@ -563,6 +627,18 @@ export function Projections({
             date, not today.
           </p>
         )}
+        {((calibration?.incomeTrend.comparisons ?? 0) < 5 ||
+          calibration?.incomeTrend.reason === "zero_total") && (
+          <p className="balance-warning">
+            Income history provides {calibration?.incomeTrend.comparisons ?? 0}{" "}
+            complete year-over-year comparisons.{" "}
+            {calibration?.incomeTrend.reason === "zero_total"
+              ? "A complete annual block has zero income, so geometric income growth and uncertainty are undefined. Enter explicit assumptions to explore a scenario."
+              : calibration?.incomeTrend.volatility === null
+                ? "There is not enough usable history to estimate income uncertainty; choose a longer window or enter an assumption."
+                : "The estimated income band is based on a small sample and may understate future uncertainty."}
+          </p>
+        )}
         {forecast ? (
           <>
             <div className="projection-legend">
@@ -576,11 +652,12 @@ export function Projections({
               </span>
             </div>
             <ProjectionChart
-              key={`${latest.date}:${settings.years}`}
-              points={forecast.points}
+              key={`${latest.date}:${settings.years}:${view}`}
+              metric={view === "income" ? "monthly income" : "account value"}
+              points={chartPoints!}
               confidence={settings.confidence}
             />
-            {forecast.shortfallProbability > 0 && (
+            {view === "value" && forecast.shortfallProbability > 0 && (
               <p className="balance-warning">
                 {(forecast.shortfallProbability * 100).toFixed(1)}% of simulated
                 paths fall below zero at least once. Negative values represent a
@@ -598,7 +675,7 @@ export function Projections({
             <p>
               {scenario && "error" in scenario
                 ? scenario.error
-                : `Enter a supported value for: ${invalid.join(", ")}. History needs at least three usable full months for each estimate.`}
+                : `Enter a supported value for: ${invalid.join(", ")}. Growth needs two complete 12-month blocks; uncertainty needs at least three. Select Max to use all available history, or enter your own assumptions.`}
             </p>
           </div>
         )}
@@ -626,15 +703,15 @@ export function Projections({
         </div>
         <div className="projection-cash-groups">
           <fieldset className="projection-cash-group">
-            <legend>Cash income</legend>
+            <legend>Income · cash + stock</legend>
             <div className="projection-cash-controls">
-              {fields.slice(0, 2).map(renderField)}
+              {fields.slice(0, 4).map(renderField)}
             </div>
           </fieldset>
           <fieldset className="projection-cash-group">
-            <legend>Cash payments</legend>
+            <legend>Payments · separate growth</legend>
             <div className="projection-cash-controls">
-              {fields.slice(2, 4).map(renderField)}
+              {fields.slice(4, 8).map(renderField)}
             </div>
           </fieldset>
         </div>
@@ -643,24 +720,33 @@ export function Projections({
           aria-live="polite"
           aria-atomic="true"
         >
-          <span>Scaled monthly cash flow</span>
+          <span>Income after one year of compounding</span>
           <p>
-            {Number.isFinite(cashFlow.net) ? (
+            {Number.isFinite(firstYear.income) ? (
               <>
-                <strong>{amount(cashFlow.income)}</strong> income −{" "}
-                <strong>{amount(cashFlow.payments)}</strong> payments ={" "}
-                <strong data-testid="projection-net-cash">
-                  {amount(cashFlow.net)}
+                <strong>{amount(baselineFlows.income)}</strong> / month now →{" "}
+                <strong data-testid="projection-year-income">
+                  {amount(firstYear.income)}
                 </strong>{" "}
-                net
+                / month after one year at {resolved.incomeGrowth}% annual growth
+                (before uncertainty).
               </>
             ) : (
-              "Enter income, payments and both scales to calculate net cash flow."
+              "Enter monthly income and an annual growth rate to see the compounded income trajectory."
             )}
+          </p>
+          <p>
+            Net monthly contribution at the start:{" "}
+            <strong data-testid="projection-net-cash">
+              {Number.isFinite(baselineFlows.net)
+                ? amount(baselineFlows.net)
+                : "—"}
+            </strong>
+            , after cash and stock outflows.
           </p>
         </div>
         <div className="projection-fields">
-          {fields.slice(4).map(renderField)}
+          {fields.slice(8).map(renderField)}
         </div>
       </section>
       <details className="projection-method" open={shortHistory}>
@@ -692,49 +778,82 @@ export function Projections({
               : "No reconstructed balances were used in these return estimates."}
           </p>
           <p>
-            Cash income, cash payments and in-kind transfers are averaged
-            separately, including zero-flow months with known coverage. Internal
-            transfers, trades, dividends, interest and fees are excluded from
-            contributions; their effects remain in investment returns. Annual
-            growth is the geometric mean of monthly time-weighted returns,
-            compounded over 12 months. Return volatility is the sample standard
-            deviation of monthly log returns × √12. Contribution variability is
-            the sample standard deviation of monthly income × income scale minus
-            payments × payment scale plus net shares, using paired historical
-            months. Scaling therefore preserves historical co-movement between
-            income and payments. A manual variability override stays fixed.
-            Editing a dollar baseline shifts its average without changing
-            historical variability.
+            Monthly baselines use the most recent{" "}
+            {calibration?.baselineMonths.length ?? 0} usable months (up to 12),
+            rather than averaging across all years. Annual trend estimates use
+            complete, non-overlapping 12-month blocks ending before the latest
+            balance’s month. Each year-over-year change compares adjacent
+            blocks. Gaps are never bridged and zero-total years withhold the
+            affected estimate.
           </p>
           <p>
-            The graph simulates 1,000 repeatable paths with independent monthly
-            normal log returns and normal net contributions at month-end. Growth
-            applies to positive account values; negative values indicate a
-            funding shortfall. The median and central {settings.confidence}%
-            range are calculated separately for each month. This range describes
-            outcomes under the selected assumptions, rather than a confidence
-            interval for an estimated mean. See{" "}
+            Income combines cash receipts and incoming stock transfers. Outgoing
+            shares remain expenses. Annual income growth is the geometric mean
+            of historical year-over-year income factors. Annual income
+            uncertainty is the sample standard deviation of their log factors,
+            expressed as a percentage. Payments have independently estimated
+            growth and uncertainty. A growth rate needs two complete annual
+            blocks; uncertainty needs at least three (two year-over-year
+            changes).
+          </p>
+          <p>
+            History provides {calibration?.annualWindows.length ?? 0} complete
+            annual blocks, {calibration?.incomeTrend.comparisons ?? 0}{" "}
+            year-over-year income changes and{" "}
+            {calibration?.paymentTrend.comparisons ?? 0} payment changes. Fewer
+            than five changes gives a fragile uncertainty estimate. Select Max
+            or enter explicit assumptions when history is insufficient.{" "}
+            {calibration?.incomeTrend.reason === "zero_total"
+              ? "A zero-income annual block makes geometric income growth undefined; no automatic income rate or band is supplied."
+              : ""}
+          </p>
+          <p>
+            The graph simulates 1,000 repeatable paths. Each projection year
+            draws a new normal log-growth factor for income and one for
+            payments, applying its monthly equivalent for the next 12 months.
+            Both cash and stock income grow with the income factor. Monthly
+            income is added to account value and payments are subtracted at
+            month-end; separate monthly investment returns grow positive account
+            value. Negative account values indicate a funding shortfall, without
+            an assumed borrowing rate.
+          </p>
+          <p>
+            The median and central {settings.confidence}% modeled range are
+            calculated at each month for both account value and monthly income.
+            The income band reflects observed variation in annual growth,
+            conditional on the chosen parameters; it is not a guaranteed
+            confidence interval.{" "}
             <a
-              href="https://www.itl.nist.gov/div898/handbook/pmd/section5/pmd512.htm"
+              href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda3669.htm"
               target="_blank"
               rel="noreferrer"
             >
-              NIST’s explanation of prediction uncertainty
+              NIST describes the lognormal model used for positive growth
+              factors
             </a>
             .
           </p>
           <p>
-            Income and payment scales are constant percentages of their monthly
-            baselines, not annual growth rates. Assumptions remain constant. The
-            model does not capture seasonality, correlated returns and income,
-            future tax changes, inflation, changing allocation, or uncertainty
-            in the estimated parameters. Historical growth may not persist.
+            Income growth compounds over time: 5% per year means ×1.05 after one
+            year and ×1.1025 after two, not a one-time percentage adjustment.
+            Rates and uncertainty stay constant as assumptions. The model
+            excludes within-year seasonality, correlations between income,
+            payments and markets, inflation, future tax changes and uncertainty
+            in estimated parameters. Saved transfer valuations are not revalued.
             Nothing is saved to the server or changes your ledger.
           </p>
           <p className="projection-months">
             Contribution months: {calibration?.flowMonths.join(", ") || "None"}.
             <br />
+            Baseline months: {calibration?.baselineMonths.join(", ") || "None"}.
+            <br />
             Return months: {calibration?.returnMonths.join(", ") || "None"}.
+            <br />
+            Annual blocks:{" "}
+            {calibration?.annualWindows
+              .map((window) => `${window.start} — ${window.end}`)
+              .join("; ") || "None"}
+            .
           </p>
         </div>
       </details>
@@ -744,8 +863,11 @@ export function Projections({
           <div className="projection-table-wrap">
             <table>
               <caption>
-                Estimated values in dollars. Bounds cover the central{" "}
-                {settings.confidence}% of modeled outcomes at each date.
+                {view === "income"
+                  ? "Monthly income in dollars per month."
+                  : "Account values in dollars."}{" "}
+                Bounds cover the central {settings.confidence}% of modeled
+                outcomes at each date.
               </caption>
               <thead>
                 <tr>
@@ -756,7 +878,7 @@ export function Projections({
                 </tr>
               </thead>
               <tbody>
-                {forecast.points
+                {chartPoints!
                   .filter((point) => point.month % 12 === 0)
                   .map((point) => (
                     <tr key={point.month}>

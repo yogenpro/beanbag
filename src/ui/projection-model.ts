@@ -28,13 +28,34 @@ export function monthBounds(anchor: string, offset: number) {
 }
 export type ProjectionAssumptions = {
   cashIncome: number;
+  stockIncome: number;
   cashPayments: number;
-  incomeScale: number;
-  paymentScale: number;
-  shares: number;
+  stockPayments: number;
+  incomeGrowth: number;
+  paymentGrowth: number;
+  incomeVolatility: number;
+  paymentVolatility: number;
   growth: number;
   volatility: number;
-  flowDeviation: number;
+};
+export type MonthlyFlows = {
+  month: string;
+  cashIncome: number;
+  stockIncome: number;
+  cashPayments: number;
+  stockPayments: number;
+};
+export type AnnualWindow = {
+  start: string;
+  end: string;
+  income: number;
+  payments: number;
+};
+export type AnnualTrend = {
+  rate: number | null;
+  volatility: number | null;
+  comparisons: number;
+  reason: "insufficient_history" | "zero_total" | null;
 };
 export type ProjectionCalibration = {
   defaults: { [K in keyof ProjectionAssumptions]: number | null };
@@ -42,42 +63,97 @@ export type ProjectionCalibration = {
   returnMonths: string[];
   reconstructed: boolean;
   historyMonths: number;
-  flowSamples: { cashIncome: number; cashPayments: number; shares: number }[];
+  flowSamples: MonthlyFlows[];
+  baselineMonths: string[];
+  annualWindows: AnnualWindow[];
+  incomeTrend: AnnualTrend;
+  paymentTrend: AnnualTrend;
 };
+const emptyTrend = (): AnnualTrend => ({
+  rate: null,
+  volatility: null,
+  comparisons: 0,
+  reason: "insufficient_history",
+});
 
-export function projectedCashFlow(
-  assumptions: Pick<
-    ProjectionAssumptions,
-    "cashIncome" | "cashPayments" | "incomeScale" | "paymentScale"
-  >,
+/** Non-overlapping complete 12-month blocks aligned with the anchor's month.
+ * Only adjacent blocks can produce a YoY comparison. Missing months and zero
+ * totals never become an invented growth observation.
+ */
+export function annualFlowTrends(
+  samples: MonthlyFlows[],
+  anchor: string,
+  lookback: number,
 ) {
-  const income = (assumptions.cashIncome * assumptions.incomeScale) / 100;
-  const payments = (assumptions.cashPayments * assumptions.paymentScale) / 100;
-  return { income, payments, net: income - payments };
+  const byMonth = new Map(samples.map((sample) => [sample.month, sample]));
+  const annualWindows: AnnualWindow[] = [];
+  for (
+    let offset = -Math.floor(lookback / 12) * 12;
+    offset <= -12;
+    offset += 12
+  ) {
+    const block = Array.from({ length: 12 }, (_, i) =>
+      byMonth.get(monthBounds(anchor, offset + i).start.slice(0, 7)),
+    );
+    if (block.some((sample) => !sample)) continue;
+    annualWindows.push({
+      start: monthBounds(anchor, offset).start,
+      end: monthBounds(anchor, offset + 11).end,
+      income: block.reduce(
+        (sum, sample) => sum + sample!.cashIncome + sample!.stockIncome,
+        0,
+      ),
+      payments: block.reduce(
+        (sum, sample) => sum + sample!.cashPayments + sample!.stockPayments,
+        0,
+      ),
+    });
+  }
+  const trend = (key: "income" | "payments"): AnnualTrend => {
+    const logs: number[] = [];
+    let zero = false;
+    for (let i = 1; i < annualWindows.length; i++) {
+      const previous = annualWindows[i - 1],
+        current = annualWindows[i];
+      if (iso(new Date(Date.parse(previous.end) + day)) !== current.start)
+        continue;
+      if (previous[key] <= 0 || current[key] <= 0) {
+        zero = true;
+        continue;
+      }
+      logs.push(Math.log(current[key] / previous[key]));
+    }
+    if (zero)
+      return {
+        ...emptyTrend(),
+        comparisons: logs.length,
+        reason: "zero_total",
+      };
+    return {
+      rate: logs.length ? Math.expm1(mean(logs)) * 100 : null,
+      volatility: logs.length >= 2 ? deviation(logs) * 100 : null,
+      comparisons: logs.length,
+      reason: logs.length >= 2 ? null : "insufficient_history",
+    };
+  };
+  return {
+    annualWindows,
+    incomeTrend: trend("income"),
+    paymentTrend: trend("payments"),
+  };
 }
 
-/** Scale each month's actual components before computing net variability.
- * This retains their historical covariance instead of adding independent noise.
- */
-export function scaledContributionDeviation(
-  calibration: ProjectionCalibration | null,
-  incomeScale: number,
-  paymentScale: number,
-): number | null {
-  if (
-    !calibration ||
-    calibration.flowSamples.length < 3 ||
-    !Number.isFinite(incomeScale) ||
-    !Number.isFinite(paymentScale)
-  )
-    return null;
-  return deviation(
-    calibration.flowSamples.map(
-      (sample) =>
-        projectedCashFlow({ ...sample, incomeScale, paymentScale }).net +
-        sample.shares,
-    ),
-  );
+export function projectedMonthlyFlows(
+  assumptions: ProjectionAssumptions,
+  month: number,
+) {
+  const incomeFactor = (1 + assumptions.incomeGrowth / 100) ** (month / 12);
+  const paymentFactor = (1 + assumptions.paymentGrowth / 100) ** (month / 12);
+  const income =
+    (assumptions.cashIncome + assumptions.stockIncome) * incomeFactor;
+  const payments =
+    (assumptions.cashPayments + assumptions.stockPayments) * paymentFactor;
+  return { income, payments, net: income - payments };
 }
 
 export type ProjectionLookback = number | "max";
@@ -94,18 +170,24 @@ export function calibrateProjection(
     defaults: {
       cashIncome: null,
       cashPayments: null,
-      incomeScale: 100,
-      paymentScale: 100,
-      shares: null,
+      stockIncome: null,
+      stockPayments: null,
+      incomeGrowth: null,
+      paymentGrowth: null,
+      incomeVolatility: null,
+      paymentVolatility: null,
       growth: null,
       volatility: null,
-      flowDeviation: null,
     },
     flowMonths: [],
     returnMonths: [],
     reconstructed: false,
     historyMonths: 0,
     flowSamples: [],
+    baselineMonths: [],
+    annualWindows: [],
+    incomeTrend: emptyTrend(),
+    paymentTrend: emptyTrend(),
   };
   const anchor = data.balances.latest?.date;
   if (!anchor) return result;
@@ -158,7 +240,9 @@ export function calibrateProjection(
     result.flowSamples.push({
       cashIncome: total("cash_income"),
       cashPayments: total("spending"),
-      shares: total("stock_income") - total("stock_spending"),
+      month: period.start.slice(0, 7),
+      stockIncome: total("stock_income"),
+      stockPayments: total("stock_spending"),
     });
     result.flowMonths.push(period.start.slice(0, 7));
     const opening = iso(new Date(Date.parse(period.start) - day));
@@ -186,22 +270,24 @@ export function calibrateProjection(
     result.returnMonths.push(period.start.slice(0, 7));
     result.reconstructed ||= twr.usesReconstructedValues;
   }
-  if (result.flowSamples.length >= 3) {
-    result.defaults.cashIncome = mean(
-      result.flowSamples.map((sample) => sample.cashIncome),
-    );
-    result.defaults.cashPayments = mean(
-      result.flowSamples.map((sample) => sample.cashPayments),
-    );
-    result.defaults.shares = mean(
-      result.flowSamples.map((sample) => sample.shares),
-    );
-    result.defaults.flowDeviation = scaledContributionDeviation(
-      result,
-      100,
-      100,
-    );
+  // Anchor the forecast in the most recent usable year, not a multi-year average
+  // that would dilute an already-growing income stream.
+  const recent = result.flowSamples.slice(-12);
+  result.baselineMonths = recent.map((sample) => sample.month);
+  if (recent.length >= 3) {
+    for (const key of [
+      "cashIncome",
+      "stockIncome",
+      "cashPayments",
+      "stockPayments",
+    ] as const)
+      result.defaults[key] = mean(recent.map((sample) => sample[key]));
   }
+  Object.assign(result, annualFlowTrends(result.flowSamples, anchor, months));
+  result.defaults.incomeGrowth = result.incomeTrend.rate;
+  result.defaults.incomeVolatility = result.incomeTrend.volatility;
+  result.defaults.paymentGrowth = result.paymentTrend.rate;
+  result.defaults.paymentVolatility = result.paymentTrend.volatility;
   if (logs.length >= 3) {
     result.defaults.growth = Math.expm1(mean(logs) * 12) * 100;
     result.defaults.volatility = deviation(logs) * Math.sqrt(12) * 100;
@@ -215,12 +301,14 @@ export const assumptionLimits: Record<
 > = {
   cashIncome: [0, 1_000_000],
   cashPayments: [0, 1_000_000],
-  incomeScale: [0, 1000],
-  paymentScale: [0, 1000],
-  shares: [-1_000_000, 1_000_000],
+  stockIncome: [0, 1_000_000],
+  stockPayments: [0, 1_000_000],
+  incomeGrowth: [-90, 200],
+  paymentGrowth: [-90, 200],
+  incomeVolatility: [0, 100],
+  paymentVolatility: [0, 100],
   growth: [-90, 100],
   volatility: [0, 100],
-  flowDeviation: [0, 1_000_000],
 };
 export type ProjectionPoint = {
   month: number;
@@ -231,11 +319,44 @@ export type ProjectionPoint = {
 };
 export type Projection = {
   points: ProjectionPoint[];
+  incomePoints: ProjectionPoint[];
   shortfallProbability: number;
 };
 
-/** Seeded Monte Carlo: monthly normal log returns and independent normal net
- * contributions, paid at month-end. Values are dollars (forecast estimates,
+/** Income forecasts do not require investment-return or expense assumptions. */
+export function projectIncome(
+  anchor: string,
+  years: number,
+  assumptions: Pick<
+    ProjectionAssumptions,
+    "cashIncome" | "stockIncome" | "incomeGrowth" | "incomeVolatility"
+  >,
+  confidence: number,
+): Projection {
+  const result = projectAccountValue(
+    0,
+    anchor,
+    years,
+    {
+      ...assumptions,
+      cashPayments: 0,
+      stockPayments: 0,
+      paymentGrowth: 0,
+      paymentVolatility: 0,
+      growth: 0,
+      volatility: 0,
+    },
+    confidence,
+  );
+  return {
+    points: [],
+    incomePoints: result.incomePoints,
+    shortfallProbability: 0,
+  };
+}
+
+/** Seeded Monte Carlo: monthly investment returns plus independently sampled
+ * annual income/payment log growth, compounded monthly and paid at month-end. Values are dollars (forecast estimates,
  * never source-ledger amounts). Below zero represents an unfunded shortfall;
  * growth applies to positive balances only, with no invented borrowing rate.
  */
@@ -282,7 +403,25 @@ export function projectAccountValue(
     },
   ];
   const drift = Math.log1p(assumptions.growth / 100) / 12;
-  const monthlyCash = projectedCashFlow(assumptions);
+  const incomes = Array.from(
+    { length: count },
+    () => assumptions.cashIncome + assumptions.stockIncome,
+  );
+  const payments = Array.from(
+    { length: count },
+    () => assumptions.cashPayments + assumptions.stockPayments,
+  );
+  const incomeFactors = Array<number>(count).fill(1),
+    paymentFactors = Array<number>(count).fill(1);
+  const incomePoints: ProjectionPoint[] = [
+    {
+      month: 0,
+      date: anchor,
+      median: incomes[0],
+      lower: incomes[0],
+      upper: incomes[0],
+    },
+  ];
   const sigma = assumptions.volatility / 100 / Math.sqrt(12);
   const tail = (1 - confidence / 100) / 2;
   const quantile = (sorted: number[], fraction: number) => {
@@ -297,14 +436,30 @@ export function projectAccountValue(
   const start = new Date(anchor + "T00:00:00Z");
   for (let month = 1; month <= months; month++) {
     for (let path = 0; path < count; path++) {
+      if ((month - 1) % 12 === 0) {
+        incomeFactors[path] = Math.exp(
+          (Math.log1p(assumptions.incomeGrowth / 100) +
+            (assumptions.incomeVolatility / 100) * normal()) /
+            12,
+        );
+        paymentFactors[path] = Math.exp(
+          (Math.log1p(assumptions.paymentGrowth / 100) +
+            (assumptions.paymentVolatility / 100) * normal()) /
+            12,
+        );
+      }
+      incomes[path] *= incomeFactors[path];
+      payments[path] *= paymentFactors[path];
       paths[path] +=
         Math.max(0, paths[path]) * Math.expm1(drift + sigma * normal()) +
-        monthlyCash.net +
-        assumptions.shares +
-        assumptions.flowDeviation * normal();
+        incomes[path] -
+        payments[path];
       if (
-        !Number.isFinite(paths[path]) ||
-        Math.abs(paths[path]) > Number.MAX_SAFE_INTEGER / 100
+        [paths[path], incomes[path], payments[path]].some(
+          (value) =>
+            !Number.isFinite(value) ||
+            Math.abs(value) > Number.MAX_SAFE_INTEGER / 100,
+        )
       )
         throw new Error(
           "This scenario exceeds the supported value range. Reduce the horizon or assumptions.",
@@ -319,6 +474,14 @@ export function projectAccountValue(
     ).getUTCDate();
     date.setUTCDate(Math.min(start.getUTCDate(), lastDay));
     const sorted = [...paths].sort((a, b) => a - b);
+    const sortedIncomes = [...incomes].sort((a, b) => a - b);
+    incomePoints.push({
+      month,
+      date: iso(date),
+      median: quantile(sortedIncomes, 0.5),
+      lower: quantile(sortedIncomes, tail),
+      upper: quantile(sortedIncomes, 1 - tail),
+    });
     points.push({
       month,
       date: iso(date),
@@ -327,5 +490,5 @@ export function projectAccountValue(
       upper: quantile(sorted, 1 - tail),
     });
   }
-  return { points, shortfallProbability: shortfall.size / count };
+  return { points, incomePoints, shortfallProbability: shortfall.size / count };
 }
