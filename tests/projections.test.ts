@@ -3,6 +3,8 @@ import {
   calibrateProjection,
   monthBounds,
   projectAccountValue,
+  projectedCashFlow,
+  scaledContributionDeviation,
   type ProjectionAssumptions,
 } from "../src/ui/projection-model";
 import {
@@ -11,13 +13,32 @@ import {
 } from "./projection-fixtures";
 
 const assumptions: ProjectionAssumptions = {
-  cash: 600,
+  cashIncome: 1000,
+  cashPayments: 400,
+  incomeScale: 100,
+  paymentScale: 100,
   shares: 400,
   growth: 0,
   volatility: 0,
   flowDeviation: 0,
 };
 describe("browser-only projection estimates", () => {
+  it("recomputes scaled variability from paired historical months, retaining income/payment covariance", () => {
+    const calibration = calibrateProjection(projectionFixture(), 12);
+    calibration.flowSamples = [100, 200, 300].map((cashIncome) => ({
+      cashIncome,
+      cashPayments: cashIncome - 20,
+      shares: 0,
+    }));
+    const before = JSON.stringify(calibration);
+    expect(scaledContributionDeviation(calibration, 100, 100)).toBe(0);
+    expect(scaledContributionDeviation(calibration, 200, 100)).toBe(100);
+    expect(scaledContributionDeviation(calibration, 100, 50)).toBe(50);
+    expect(scaledContributionDeviation(calibration, 0, 0)).toBe(0);
+    expect(scaledContributionDeviation(calibration, NaN, 100)).toBeNull();
+    expect(scaledContributionDeviation(null, 100, 100)).toBeNull();
+    expect(JSON.stringify(calibration)).toBe(before);
+  });
   it("Max includes covered months and daily returns older than five years", () => {
     const fixture = longProjectionFixture();
     const fiveYears = calibrateProjection(fixture, 60);
@@ -29,15 +50,17 @@ describe("browser-only projection estimates", () => {
     expect(max.returnMonths).toHaveLength(8);
     expect(max.returnMonths[0]).toBe("2021-01");
     expect(fiveYears.returnMonths).toHaveLength(4);
-    expect(fiveYears.defaults.cash).toBe(40);
-    expect(max.defaults.cash).toBe(75);
+    expect(fiveYears.defaults.cashIncome).toBeCloseTo((1000 * 4) / 60);
+    expect(fiveYears.defaults.cashPayments).toBeCloseTo((400 * 4) / 60);
+    expect(max.defaults.cashIncome).toBe(125);
+    expect(max.defaults.cashPayments).toBe(50);
     expect(max.defaults.shares).toBe(50);
     expect(max.flowMonths.at(-1)).toBe("2026-04");
   });
   it("Max handles missing coverage and a start within the anchor month without invented estimates", () => {
     const fixture = projectionFixture();
     fixture.coverage = [];
-    expect(calibrateProjection(fixture, "max").defaults.cash).toBeNull();
+    expect(calibrateProjection(fixture, "max").defaults.cashIncome).toBeNull();
     fixture.availablePeriod.start = "2026-05-01";
     const result = calibrateProjection(fixture, "max");
     expect(result.historyMonths).toBe(0);
@@ -53,7 +76,8 @@ describe("browser-only projection estimates", () => {
       "2026-04",
     ]);
     expect(result.returnMonths).toEqual(result.flowMonths);
-    expect(result.defaults.cash).toBe(600);
+    expect(result.defaults.cashIncome).toBe(1000);
+    expect(result.defaults.cashPayments).toBe(400);
     expect(result.defaults.shares).toBe(400);
     expect(result.defaults.flowDeviation).toBe(0);
     const logs = [0.01, -0.005, 0.02, 0.015].map(Math.log1p);
@@ -86,7 +110,8 @@ describe("browser-only projection estimates", () => {
       });
     const result = calibrateProjection(fixture, 12);
     expect(result.flowMonths).toHaveLength(4);
-    expect(result.defaults.cash).toBe(450);
+    expect(result.defaults.cashIncome).toBe(750);
+    expect(result.defaults.cashPayments).toBe(300);
     expect(result.defaults.shares).toBe(300);
     expect(result.defaults.flowDeviation).toBe(500);
   });
@@ -96,7 +121,8 @@ describe("browser-only projection estimates", () => {
       (point) => !["2026-01-31", "2026-04-10"].includes(point.date),
     );
     const result = calibrateProjection(fixture, 12);
-    expect(result.defaults.cash).toBe(600);
+    expect(result.defaults.cashIncome).toBe(1000);
+    expect(result.defaults.cashPayments).toBe(400);
     expect(result.returnMonths).toEqual(["2026-03"]);
     expect(result.defaults.growth).toBeNull();
     expect(result.defaults.volatility).toBeNull();
@@ -108,7 +134,9 @@ describe("browser-only projection estimates", () => {
     const result = calibrateProjection(fixture, 12);
     expect(result.flowMonths).toEqual(["2026-03", "2026-04"]);
     expect(
-      Object.values(result.defaults).every((value) => value === null),
+      Object.entries(result.defaults)
+        .filter(([key]) => !["incomeScale", "paymentScale"].includes(key))
+        .every(([, value]) => value === null),
     ).toBe(true);
   });
   it("accepts reconstructed daily values with explicit provenance and does not mutate source data", () => {
@@ -120,6 +148,50 @@ describe("browser-only projection estimates", () => {
   });
 });
 describe("future value simulation", () => {
+  it("scales gross income and positive payments independently at constant percentages", () => {
+    const settings = {
+      ...assumptions,
+      incomeScale: 120,
+      paymentScale: 80,
+      shares: 0,
+    };
+    expect(projectedCashFlow(settings)).toEqual({
+      income: 1200,
+      payments: 320,
+      net: 880,
+    });
+    const result = projectAccountValue(
+      10_000_000,
+      "2026-05-15",
+      1,
+      settings,
+      80,
+    );
+    expect(result.points[1].median).toBe(100_880);
+    expect(result.points[12].median).toBe(110_560);
+    const noIncome = projectAccountValue(
+      10_000_000,
+      "2026-05-15",
+      1,
+      { ...settings, incomeScale: 0, paymentScale: 100 },
+      80,
+    );
+    expect(noIncome.points[12].median).toBe(95_200);
+    // Equal historical net flows can react differently to an income-only scale.
+    expect(
+      projectedCashFlow({ ...settings, incomeScale: 50, paymentScale: 100 })
+        .net,
+    ).toBe(100);
+    expect(
+      projectedCashFlow({
+        ...settings,
+        cashIncome: 2000,
+        cashPayments: 1400,
+        incomeScale: 50,
+        paymentScale: 100,
+      }).net,
+    ).toBe(-400);
+  });
   it("matches closed-form constant contributions and growth without uncertainty", () => {
     const linear = projectAccountValue(
       10_000_000,
@@ -172,7 +244,7 @@ describe("future value simulation", () => {
       100_000,
       "2026-01-31",
       1,
-      { ...assumptions, cash: -200, shares: 0 },
+      { ...assumptions, cashIncome: 0, cashPayments: 200, shares: 0 },
       80,
     );
     expect(result.shortfallProbability).toBe(1);
@@ -186,6 +258,22 @@ describe("future value simulation", () => {
     expect(monthBounds("2024-03-31", -1).end).toBe("2024-02-29");
   });
   it("rejects invalid parameters and excessive numeric results", () => {
+    for (const patch of [
+      { cashIncome: -1 },
+      { cashPayments: -1 },
+      { incomeScale: -1 },
+      { paymentScale: 1001 },
+      { incomeScale: Infinity },
+    ])
+      expect(() =>
+        projectAccountValue(
+          100,
+          "2026-05-15",
+          1,
+          { ...assumptions, ...patch },
+          80,
+        ),
+      ).toThrow();
     for (const growth of [NaN, Infinity, -100, 101])
       expect(() =>
         projectAccountValue(

@@ -2411,6 +2411,46 @@ pre {
 .projection-assumptions {
   padding: 36px 0 28px;
 }
+.projection-cash-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+.projection-cash-group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.projection-cash-group legend {
+  padding: 0;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.projection-cash-controls {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+}
+.projection-cash-controls .projection-field label {
+  min-height: 42px;
+  align-content: start;
+}
+.projection-cash-result {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 24px 0 28px;
+  padding: 20px 0;
+  color: var(--secondary);
+}
+.projection-cash-result p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+}
+.projection-cash-result strong {
+  color: var(--ink);
+  font-weight: 500;
+}
 .projection-fields {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2564,6 +2604,9 @@ pre {
   .projection-fields {
     grid-template-columns: 1fr;
     gap: 24px;
+  }
+  .projection-cash-groups {
+    grid-template-columns: 1fr;
   }
   .projections .panel-heading {
     align-items: start;

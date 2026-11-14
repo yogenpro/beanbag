@@ -4,6 +4,81 @@ import {
   projectionFixture,
 } from "../projection-fixtures";
 
+test("cash income and payments have independent percentage scales and update forecast locally", async ({
+  page,
+}) => {
+  const fixture = projectionFixture();
+  const writes: string[] = [],
+    requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/")) requests.push(request.url());
+    if (!["GET", "HEAD"].includes(request.method()))
+      writes.push(request.method());
+  });
+  await page.route("**/api/report*", (route) =>
+    route.fulfill({ json: fixture }),
+  );
+  await page.goto("/");
+  await page.locator("#projections-tab").click();
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("1000");
+  await expect(page.getByLabel("Monthly cash payments")).toHaveValue("400");
+  await expect(page.getByLabel("Cash income scale")).toHaveValue("100");
+  await expect(page.getByLabel("Cash payments scale")).toHaveValue("100");
+  await expect(page.getByTestId("projection-net-cash")).toHaveText("$600.00");
+  await page.getByLabel("Annual investment growth").fill("0");
+  await page.getByLabel("Annual return volatility").fill("0");
+  await page.getByLabel("Monthly contribution variability").fill("0");
+  await page.getByLabel("Project ahead").selectOption("1");
+  const requestCount = requests.length;
+  const start = fixture.balances.latest!.netWorthCents! / 100;
+  const currency = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(value);
+  await page.getByLabel("Cash income scale").fill("120");
+  await page.getByLabel("Cash payments scale").fill("80");
+  await expect(page.getByTestId("projection-net-cash")).toHaveText("$880.00");
+  await expect(page.getByTestId("projection-end")).toHaveText(
+    currency(start + (880 + 400) * 12),
+  );
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("1000");
+  await expect(page.getByLabel("Monthly cash payments")).toHaveValue("400");
+  await page.getByLabel("Cash income scale").fill("0");
+  await expect(page.getByTestId("projection-net-cash")).toHaveText("-$320.00");
+  await expect(page.getByTestId("projection-end")).toHaveText(
+    currency(start + 80 * 12),
+  );
+  await page.getByLabel("Cash income scale").fill("120");
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement)?.blur();
+    window.scrollTo(0, 0);
+  });
+  await page.screenshot({
+    path: `test-results/projections-cash-scales-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  expect(requests).toHaveLength(requestCount);
+  expect(writes).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+  await page.locator("#overview-tab").click();
+  await page.locator("#projections-tab").click();
+  await expect(page.getByLabel("Cash income scale")).toHaveValue("120");
+  await expect(page.getByLabel("Cash payments scale")).toHaveValue("80");
+  await page.getByRole("button", { name: "Use history estimates" }).click();
+  await expect(page.getByLabel("Cash income scale")).toHaveValue("100");
+  await expect(page.getByLabel("Cash payments scale")).toHaveValue("100");
+  await expect(page.getByTestId("projection-net-cash")).toHaveText("$600.00");
+  await page.getByLabel("Cash payments scale").fill("1001");
+  await expect(
+    page.getByRole("img", { name: /Projected account value/ }),
+  ).toHaveCount(0);
+});
+
 test("Max uses all saved history beyond five years and keeps assumptions local", async ({
   page,
 }) => {
@@ -46,7 +121,25 @@ test("Max uses all saved history beyond five years and keeps assumptions local",
     ),
   ).toBe(true);
   await page.getByLabel("History window").selectOption("max");
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("75");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("125");
+  await expect(page.getByLabel("Monthly cash payments")).toHaveValue("50");
+  await expect(page.getByLabel("Monthly contribution variability")).toHaveValue(
+    "333.33",
+  );
+  await page.getByLabel("Cash income scale").fill("200");
+  await expect(page.getByLabel("Monthly contribution variability")).toHaveValue(
+    "666.67",
+  );
+  await page.getByLabel("Cash payments scale").fill("200");
+  await expect(page.getByLabel("Monthly contribution variability")).toHaveValue(
+    "533.33",
+  );
+  await page.getByLabel("Monthly contribution variability").fill("250");
+  await page.getByLabel("Cash income scale").fill("100");
+  await expect(page.getByLabel("Monthly contribution variability")).toHaveValue(
+    "250",
+  );
+  await page.getByRole("button", { name: "Use history estimates" }).click();
   await expect(page.getByLabel("Monthly net share transfers")).toHaveValue(
     "50",
   );
@@ -71,16 +164,16 @@ test("Max uses all saved history beyond five years and keeps assumptions local",
     fullPage: true,
   });
   await page.getByLabel("History window").selectOption("60");
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("40");
-  await page.getByLabel("Monthly net cash flow").fill("1234");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("66.67");
+  await page.getByLabel("Monthly cash income").fill("1234");
   await page.getByLabel("History window").selectOption("max");
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("1234");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("1234");
   expect(requests).toHaveLength(requestCount);
   expect(writes).toEqual([]);
   await page.locator("#overview-tab").click();
   await page.locator("#projections-tab").click();
   await expect(page.getByLabel("History window")).toHaveValue("max");
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("1234");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("1234");
 });
 
 test("projection assumptions update the graph locally, survive tab changes, and never write", async ({
@@ -106,7 +199,7 @@ test("projection assumptions update the graph locally, survive tab changes, and 
   await expect(
     page.getByRole("img", { name: /Projected account value/ }),
   ).toBeVisible();
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("600");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("1000");
   await expect(page.getByLabel("Monthly net share transfers")).toHaveValue(
     "400",
   );
@@ -124,7 +217,7 @@ test("projection assumptions update the graph locally, survive tab changes, and 
   );
   const before = await page.getByTestId("projection-end").textContent();
   const requestCount = requests.length;
-  await page.getByLabel("Monthly net cash flow").fill("2600");
+  await page.getByLabel("Monthly cash income").fill("3000");
   await expect(page.getByTestId("projection-end")).not.toHaveText(before!);
   await page.getByLabel("Annual return volatility").fill("20");
   await page
@@ -169,9 +262,9 @@ test("projection assumptions update the graph locally, survive tab changes, and 
   ).toBe(false);
   await page.locator("#overview-tab").click();
   await page.locator("#projections-tab").click();
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("2600");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("3000");
   await page.getByRole("button", { name: "Use history estimates" }).click();
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("600");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("1000");
   await page.getByLabel("Annual investment growth").fill("-100");
   await expect(
     page.getByRole("heading", { name: "Set assumptions to see the forecast" }),
@@ -211,10 +304,11 @@ test("insufficient history requires explicit assumptions and unknown net value b
   await expect(
     page.getByRole("heading", { name: "Set assumptions to see the forecast" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Monthly net cash flow")).toHaveValue("");
+  await expect(page.getByLabel("Monthly cash income")).toHaveValue("");
   await expect(page.getByLabel("Annual investment growth")).toHaveValue("");
   for (const label of [
-    "Monthly net cash flow",
+    "Monthly cash income",
+    "Monthly cash payments",
     "Monthly net share transfers",
     "Annual investment growth",
     "Annual return volatility",

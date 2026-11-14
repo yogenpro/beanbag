@@ -5,6 +5,8 @@ import {
   assumptionLimits,
   calibrateProjection,
   projectAccountValue,
+  projectedCashFlow,
+  scaledContributionDeviation,
   type ProjectionAssumptions,
   type ProjectionPoint,
   type ProjectionLookback,
@@ -30,17 +32,39 @@ const compact = (dollars: number) =>
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(dollars);
-const fields: {
+type ProjectionField = {
   key: keyof ProjectionAssumptions;
   label: string;
   unit: string;
   help: string;
-}[] = [
+  defaultLabel?: string;
+};
+const fields: ProjectionField[] = [
   {
-    key: "cash",
-    label: "Monthly net cash flow",
+    key: "cashIncome",
+    label: "Monthly cash income",
     unit: "$ / month",
-    help: "External cash income minus cash payments.",
+    help: "Average external cash received before scaling.",
+  },
+  {
+    key: "incomeScale",
+    label: "Cash income scale",
+    unit: "% of baseline",
+    help: "100% keeps the monthly baseline; 120% increases it by 20%.",
+    defaultLabel: "Unscaled baseline",
+  },
+  {
+    key: "cashPayments",
+    label: "Monthly cash payments",
+    unit: "$ / month",
+    help: "Average external cash paid, entered as a positive amount.",
+  },
+  {
+    key: "paymentScale",
+    label: "Cash payments scale",
+    unit: "% of baseline",
+    help: "100% keeps the monthly baseline; 80% reduces it by 20%.",
+    defaultLabel: "Unscaled baseline",
   },
   {
     key: "shares",
@@ -64,9 +88,63 @@ const fields: {
     key: "flowDeviation",
     label: "Monthly contribution variability",
     unit: "$ / month",
-    help: "Standard deviation of combined cash and share contributions.",
+    help: "Recomputed from scaled monthly history unless you enter your own value.",
   },
 ];
+
+function AssumptionField({
+  field,
+  historical,
+  override,
+  invalid,
+  onChange,
+}: {
+  field: ProjectionField;
+  historical: number | null | undefined;
+  override: string | undefined;
+  invalid: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [min, max] = assumptionLimits[field.key];
+  const outsideLimits =
+    historical != null && (historical < min || historical > max);
+  return (
+    <div className="projection-field">
+      <label htmlFor={`projection-${field.key}`}>
+        {field.label}
+        <span>{field.unit}</span>
+      </label>
+      <input
+        id={`projection-${field.key}`}
+        type="number"
+        step="any"
+        min={min}
+        max={max}
+        value={
+          override ??
+          (historical == null ? "" : Number(historical.toFixed(2)).toString())
+        }
+        placeholder="Enter assumption"
+        aria-invalid={invalid}
+        aria-describedby={`projection-${field.key}-help`}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <p id={`projection-${field.key}-help`}>{field.help}</p>
+      <span className="projection-source">
+        {override !== undefined
+          ? "Your assumption"
+          : outsideLimits
+            ? "History estimate outside supported limits; enter an assumption"
+            : historical == null
+              ? "Insufficient usable history"
+              : (field.defaultLabel ?? "Estimated from history")}
+      </span>
+      <span className="projection-limit">
+        Supported: {min.toLocaleString()} to {max.toLocaleString()}
+      </span>
+    </div>
+  );
+}
 
 function ProjectionChart({
   points,
@@ -280,10 +358,18 @@ export function Projections({
     [history, settings.lookback],
   );
   const resolved = {} as ProjectionAssumptions;
+  const historicalValue = (key: keyof ProjectionAssumptions) =>
+    key === "flowDeviation"
+      ? scaledContributionDeviation(
+          calibration,
+          resolved.incomeScale,
+          resolved.paymentScale,
+        )
+      : calibration?.defaults[key];
   const invalid: string[] = [];
   for (const field of fields) {
     const override = settings.overrides[field.key];
-    const historical = calibration?.defaults[field.key];
+    const historical = historicalValue(field.key);
     const value =
       override === undefined
         ? historical == null
@@ -366,6 +452,19 @@ export function Projections({
       calibration?.flowMonths.length ?? 0,
       calibration?.returnMonths.length ?? 0,
     ) < 12;
+  const cashFlow = projectedCashFlow(resolved);
+  const renderField = (field: ProjectionField) => (
+    <AssumptionField
+      key={field.key}
+      field={field}
+      historical={historicalValue(field.key)}
+      override={settings.overrides[field.key]}
+      invalid={invalid.includes(field.label)}
+      onChange={(value) =>
+        update({ overrides: { ...settings.overrides, [field.key]: value } })
+      }
+    />
+  );
   return (
     <div className="projections">
       <div className="projection-toolbar">
@@ -525,62 +624,43 @@ export function Projections({
             Use history estimates
           </button>
         </div>
+        <div className="projection-cash-groups">
+          <fieldset className="projection-cash-group">
+            <legend>Cash income</legend>
+            <div className="projection-cash-controls">
+              {fields.slice(0, 2).map(renderField)}
+            </div>
+          </fieldset>
+          <fieldset className="projection-cash-group">
+            <legend>Cash payments</legend>
+            <div className="projection-cash-controls">
+              {fields.slice(2, 4).map(renderField)}
+            </div>
+          </fieldset>
+        </div>
+        <div
+          className="projection-cash-result"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span>Scaled monthly cash flow</span>
+          <p>
+            {Number.isFinite(cashFlow.net) ? (
+              <>
+                <strong>{amount(cashFlow.income)}</strong> income −{" "}
+                <strong>{amount(cashFlow.payments)}</strong> payments ={" "}
+                <strong data-testid="projection-net-cash">
+                  {amount(cashFlow.net)}
+                </strong>{" "}
+                net
+              </>
+            ) : (
+              "Enter income, payments and both scales to calculate net cash flow."
+            )}
+          </p>
+        </div>
         <div className="projection-fields">
-          {fields.map((field) => {
-            const historical = calibration?.defaults[field.key];
-            const override = settings.overrides[field.key];
-            const outsideLimits =
-              historical !== null &&
-              historical !== undefined &&
-              (historical < assumptionLimits[field.key][0] ||
-                historical > assumptionLimits[field.key][1]);
-            return (
-              <div className="projection-field" key={field.key}>
-                <label htmlFor={`projection-${field.key}`}>
-                  {field.label}
-                  <span>{field.unit}</span>
-                </label>
-                <input
-                  id={`projection-${field.key}`}
-                  type="number"
-                  step="any"
-                  min={assumptionLimits[field.key][0]}
-                  max={assumptionLimits[field.key][1]}
-                  value={
-                    override ??
-                    (historical === null || historical === undefined
-                      ? ""
-                      : Number(historical.toFixed(2)).toString())
-                  }
-                  placeholder="Enter assumption"
-                  aria-invalid={invalid.includes(field.label)}
-                  aria-describedby={`projection-${field.key}-help`}
-                  onChange={(event) =>
-                    update({
-                      overrides: {
-                        ...settings.overrides,
-                        [field.key]: event.target.value,
-                      },
-                    })
-                  }
-                />
-                <p id={`projection-${field.key}-help`}>{field.help}</p>
-                <span className="projection-source">
-                  {override !== undefined
-                    ? "Your assumption"
-                    : outsideLimits
-                      ? "History estimate outside supported limits; enter an assumption"
-                      : historical === null || historical === undefined
-                        ? "Insufficient usable history"
-                        : "Estimated from history"}
-                </span>
-                <span className="projection-limit">
-                  Supported: {assumptionLimits[field.key][0].toLocaleString()}{" "}
-                  to {assumptionLimits[field.key][1].toLocaleString()}
-                </span>
-              </div>
-            );
-          })}
+          {fields.slice(4).map(renderField)}
         </div>
       </section>
       <details className="projection-method" open={shortHistory}>
@@ -612,14 +692,19 @@ export function Projections({
               : "No reconstructed balances were used in these return estimates."}
           </p>
           <p>
-            Cash and in-kind transfers are averaged separately, including
-            zero-flow months with known coverage. Internal transfers, trades,
-            dividends, interest and fees are excluded from contributions; their
-            effects remain in investment returns. Annual growth is the geometric
-            mean of monthly time-weighted returns, compounded over 12 months.
-            Return volatility is the sample standard deviation of monthly log
-            returns × √12. Contribution variability is the sample standard
-            deviation of monthly net cash plus shares.
+            Cash income, cash payments and in-kind transfers are averaged
+            separately, including zero-flow months with known coverage. Internal
+            transfers, trades, dividends, interest and fees are excluded from
+            contributions; their effects remain in investment returns. Annual
+            growth is the geometric mean of monthly time-weighted returns,
+            compounded over 12 months. Return volatility is the sample standard
+            deviation of monthly log returns × √12. Contribution variability is
+            the sample standard deviation of monthly income × income scale minus
+            payments × payment scale plus net shares, using paired historical
+            months. Scaling therefore preserves historical co-movement between
+            income and payments. A manual variability override stays fixed.
+            Editing a dollar baseline shifts its average without changing
+            historical variability.
           </p>
           <p>
             The graph simulates 1,000 repeatable paths with independent monthly
@@ -639,11 +724,12 @@ export function Projections({
             .
           </p>
           <p>
-            Assumptions remain constant. The model does not capture seasonality,
-            correlated returns and income, future tax changes, inflation,
-            changing allocation, or uncertainty in the estimated parameters.
-            Historical growth may not persist. Nothing is saved to the server or
-            changes your ledger.
+            Income and payment scales are constant percentages of their monthly
+            baselines, not annual growth rates. Assumptions remain constant. The
+            model does not capture seasonality, correlated returns and income,
+            future tax changes, inflation, changing allocation, or uncertainty
+            in the estimated parameters. Historical growth may not persist.
+            Nothing is saved to the server or changes your ledger.
           </p>
           <p className="projection-months">
             Contribution months: {calibration?.flowMonths.join(", ") || "None"}.
