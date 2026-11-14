@@ -148,8 +148,11 @@ or new background price job.
 Projections starts from the latest saved combined net value and runs entirely in
 the browser using saved records from the existing read-only report API. Choose a
 12-month, 3-year, 5-year or Max (all available) history window and a 1–30-year
-horizon. Adjust monthly net cash flow, monthly net share transfers, annual
-geometric growth, return volatility and contribution variability. Changes update
+horizon. Adjust monthly cash income and cash payments separately, each with its
+own percentage scale (100% keeps its baseline). The forecast subtracts scaled
+payments from scaled income; these constant multipliers are not annual growth
+rates. You can also adjust monthly net share transfers, annual geometric growth,
+return volatility and contribution variability. Changes update
 the graph immediately.
 Inputs stay in browser memory across dashboard tabs and reset on page reload;
 there are no server writes, cookies or local-storage records for scenarios.
@@ -157,11 +160,14 @@ there are no server writes, cookies or local-storage records for scenarios.
 History estimates use at least three usable whole calendar months before the
 latest balance's month. Contribution estimates require both products' loaded
 transaction windows and no unresolved external flows. Known zero-flow months
-count; missing months do not. Cash and shares remain separate, using the existing
+count; missing months do not. Cash income, cash payments and shares remain separate, using the existing
 accounting boundary and saved share-transfer values. Growth and volatility use
 monthly daily-linked time-weighted returns and additionally require every daily
 net balance, including the previous month-end. Missing estimates require manual
-assumptions rather than an invented zero or current market quote.
+assumptions rather than an invented zero or current market quote. Historical
+contribution variability is recalculated from paired months after scaling income
+and payments, preserving their covariance; an explicit variability override stays
+fixed. Dollar baseline edits shift the average without changing that variability.
 
 The line is the median of 1,000 repeatable simulated paths; the shaded band covers
 the central 50%, 80% or 95% of modeled outcomes at each month. Monthly log returns

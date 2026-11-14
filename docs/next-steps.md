@@ -12,6 +12,9 @@ inspection and annual table all run locally; inputs remain in browser memory and
 reset on reload. No backend endpoint, schema or infrastructure change is needed.
 History windows include Max, which uses all available loaded history and retains
 the same whole-month coverage and return-quality requirements.
+Cash income and cash payments have separate monthly baselines and percentage
+scales (100% follows the baseline). Variability follows the scaled paired history
+unless manually overridden. These percentages do not compound annually.
 See README's future-projections section for the model and its limitations.
 This local implementation does not establish deployment or live-data coverage.
 

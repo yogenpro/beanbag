@@ -27,7 +27,10 @@ export function monthBounds(anchor: string, offset: number) {
   };
 }
 export type ProjectionAssumptions = {
-  cash: number;
+  cashIncome: number;
+  cashPayments: number;
+  incomeScale: number;
+  paymentScale: number;
   shares: number;
   growth: number;
   volatility: number;
@@ -39,7 +42,43 @@ export type ProjectionCalibration = {
   returnMonths: string[];
   reconstructed: boolean;
   historyMonths: number;
+  flowSamples: { cashIncome: number; cashPayments: number; shares: number }[];
 };
+
+export function projectedCashFlow(
+  assumptions: Pick<
+    ProjectionAssumptions,
+    "cashIncome" | "cashPayments" | "incomeScale" | "paymentScale"
+  >,
+) {
+  const income = (assumptions.cashIncome * assumptions.incomeScale) / 100;
+  const payments = (assumptions.cashPayments * assumptions.paymentScale) / 100;
+  return { income, payments, net: income - payments };
+}
+
+/** Scale each month's actual components before computing net variability.
+ * This retains their historical covariance instead of adding independent noise.
+ */
+export function scaledContributionDeviation(
+  calibration: ProjectionCalibration | null,
+  incomeScale: number,
+  paymentScale: number,
+): number | null {
+  if (
+    !calibration ||
+    calibration.flowSamples.length < 3 ||
+    !Number.isFinite(incomeScale) ||
+    !Number.isFinite(paymentScale)
+  )
+    return null;
+  return deviation(
+    calibration.flowSamples.map(
+      (sample) =>
+        projectedCashFlow({ ...sample, incomeScale, paymentScale }).net +
+        sample.shares,
+    ),
+  );
+}
 
 export type ProjectionLookback = number | "max";
 
@@ -53,7 +92,10 @@ export function calibrateProjection(
 ): ProjectionCalibration {
   const result: ProjectionCalibration = {
     defaults: {
-      cash: null,
+      cashIncome: null,
+      cashPayments: null,
+      incomeScale: 100,
+      paymentScale: 100,
       shares: null,
       growth: null,
       volatility: null,
@@ -63,6 +105,7 @@ export function calibrateProjection(
     returnMonths: [],
     reconstructed: false,
     historyMonths: 0,
+    flowSamples: [],
   };
   const anchor = data.balances.latest?.date;
   if (!anchor) return result;
@@ -78,9 +121,7 @@ export function calibrateProjection(
       ? Math.max(0, monthIndex(anchor) - monthIndex(historyStart))
       : lookback;
   result.historyMonths = months;
-  const cash: number[] = [],
-    shares: number[] = [],
-    logs: number[] = [];
+  const logs: number[] = [];
   const ids = new Set(data.accounts.map((account) => account.id));
   for (let offset = -months; offset < 0; offset++) {
     const period = monthBounds(anchor, offset);
@@ -114,8 +155,11 @@ export function calibrateProjection(
           (record) => record.status === "confirmed" && record.kind === kind,
         )
         .reduce((sum, record) => sum + record.amountCents!, 0) / 100;
-    cash.push(total("cash_income") - total("spending"));
-    shares.push(total("stock_income") - total("stock_spending"));
+    result.flowSamples.push({
+      cashIncome: total("cash_income"),
+      cashPayments: total("spending"),
+      shares: total("stock_income") - total("stock_spending"),
+    });
     result.flowMonths.push(period.start.slice(0, 7));
     const opening = iso(new Date(Date.parse(period.start) - day));
     // Require exact month boundaries; accountValueChange otherwise permits a shorter window.
@@ -142,11 +186,20 @@ export function calibrateProjection(
     result.returnMonths.push(period.start.slice(0, 7));
     result.reconstructed ||= twr.usesReconstructedValues;
   }
-  if (cash.length >= 3) {
-    result.defaults.cash = mean(cash);
-    result.defaults.shares = mean(shares);
-    result.defaults.flowDeviation = deviation(
-      cash.map((value, i) => value + shares[i]),
+  if (result.flowSamples.length >= 3) {
+    result.defaults.cashIncome = mean(
+      result.flowSamples.map((sample) => sample.cashIncome),
+    );
+    result.defaults.cashPayments = mean(
+      result.flowSamples.map((sample) => sample.cashPayments),
+    );
+    result.defaults.shares = mean(
+      result.flowSamples.map((sample) => sample.shares),
+    );
+    result.defaults.flowDeviation = scaledContributionDeviation(
+      result,
+      100,
+      100,
     );
   }
   if (logs.length >= 3) {
@@ -160,7 +213,10 @@ export const assumptionLimits: Record<
   keyof ProjectionAssumptions,
   [number, number]
 > = {
-  cash: [-1_000_000, 1_000_000],
+  cashIncome: [0, 1_000_000],
+  cashPayments: [0, 1_000_000],
+  incomeScale: [0, 1000],
+  paymentScale: [0, 1000],
   shares: [-1_000_000, 1_000_000],
   growth: [-90, 100],
   volatility: [0, 100],
@@ -226,6 +282,7 @@ export function projectAccountValue(
     },
   ];
   const drift = Math.log1p(assumptions.growth / 100) / 12;
+  const monthlyCash = projectedCashFlow(assumptions);
   const sigma = assumptions.volatility / 100 / Math.sqrt(12);
   const tail = (1 - confidence / 100) / 2;
   const quantile = (sorted: number[], fraction: number) => {
@@ -242,7 +299,7 @@ export function projectAccountValue(
     for (let path = 0; path < count; path++) {
       paths[path] +=
         Math.max(0, paths[path]) * Math.expm1(drift + sigma * normal()) +
-        assumptions.cash +
+        monthlyCash.net +
         assumptions.shares +
         assumptions.flowDeviation * normal();
       if (

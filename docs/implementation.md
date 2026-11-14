@@ -101,10 +101,16 @@ coverage, unresolved flows and missing daily values withhold unsupported default
 manual assumptions are explicit. Model details disclose nominal-dollar values,
 constant parameters, independent return/contribution draws and unmodeled risks.
 
-The updated credential-free suite passes 257 tests, including eleven projection
+Cash income and cash payments have separate monthly baselines and percentage
+scales. Each defaults to 100%; their scaled difference drives future cash flow.
+Historical monthly components stay paired when recalculating contribution
+variability, while manual variability overrides remain fixed. Inputs remain local.
+
+The updated credential-free suite passes 259 tests, including thirteen projection
 tests for cash/share separation, zero-flow months, data gaps, reconstructed
 provenance, known future-value arithmetic, repeatable percentiles, depletion and
-numeric limits and Max history beyond five years. All 24 desktop/mobile browser checks pass, including forecast
+numeric limits, independent income/payment scales and Max history beyond five
+years. All 26 desktop/mobile browser checks pass, including forecast
 parameter updates without requests, navigation/reset behavior, missing history,
 unknown net balances, retries and responsive screenshots. Production UI build,
 privacy scan and Worker dry run pass. This verifies the local synthetic app;
