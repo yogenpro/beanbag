@@ -12,9 +12,14 @@ inspection and annual table all run locally; inputs remain in browser memory and
 reset on reload. No backend endpoint, schema or infrastructure change is needed.
 History windows include Max, which uses all available loaded history and retains
 the same whole-month coverage and return-quality requirements.
-Cash income and cash payments have separate monthly baselines and percentage
-scales (100% follows the baseline). Variability follows the scaled paired history
-unless manually overridden. These percentages do not compound annually.
+Income now combines cash and incoming stock transfers and compounds at an
+annual growth rate estimated from adjacent complete 12-month blocks. Annual
+variation supplies a separate income outcome band. Payments have their own annual
+growth/uncertainty assumptions, and investment returns remain independent. Max
+is the default history window because annual estimates need multiple complete
+years. Monthly baselines use the most recent usable year. Short history and
+zero-total annual blocks withhold unsupported defaults; manual assumptions remain
+available. This supersedes the one-time percentage scaling interpretation.
 See README's future-projections section for the model and its limitations.
 This local implementation does not establish deployment or live-data coverage.
 

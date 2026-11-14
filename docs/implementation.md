@@ -101,20 +101,25 @@ coverage, unresolved flows and missing daily values withhold unsupported default
 manual assumptions are explicit. Model details disclose nominal-dollar values,
 constant parameters, independent return/contribution draws and unmodeled risks.
 
-Cash income and cash payments have separate monthly baselines and percentage
-scales. Each defaults to 100%; their scaled difference drives future cash flow.
-Historical monthly components stay paired when recalculating contribution
-variability, while manual variability overrides remain fixed. Inputs remain local.
+The November 14 correction replaces one-time income/payment percentages with
+annual compounding. Income combines cash and incoming stock, with growth and
+uncertainty estimated from complete, non-overlapping annual blocks. Outgoing
+stock remains an expense. Payments have separate growth/uncertainty parameters,
+and investment returns remain independent. Monthly baselines use the recent
+usable year. A separate monthly-income graph/table visualizes compounded income
+and its modeled band, including when investment data is unavailable. Short
+history, zero-income years and excluded annual blocks are explained explicitly.
+Max is now the default so all available years can support these estimates.
 
-The updated credential-free suite passes 259 tests, including thirteen projection
-tests for cash/share separation, zero-flow months, data gaps, reconstructed
-provenance, known future-value arithmetic, repeatable percentiles, depletion and
-numeric limits, independent income/payment scales and Max history beyond five
-years. All 26 desktop/mobile browser checks pass, including forecast
-parameter updates without requests, navigation/reset behavior, missing history,
-unknown net balances, retries and responsive screenshots. Production UI build,
-privacy scan and Worker dry run pass. This verifies the local synthetic app;
-it does not establish deployment or live-data completeness.
+The updated credential-free suite passes 261 tests, including fifteen projection
+tests for annual aggregation, geometric growth, yearly variation, complete-year
+requirements, gaps/zero totals, cash/stock separation, recent baselines,
+income-only forecasts, repeatable outcome bands, compounding arithmetic,
+depletion and numeric limits. All 24 desktop/mobile browser checks pass,
+including history selection, manual assumptions, income/account graph switching,
+annual tables, independent market assumptions, retries and local-only parameter
+changes. Production UI build, privacy scan and Worker dry run pass. Screenshots
+use invented records. These checks do not establish live-data completeness.
 
 The local implementation passes 128 accounting, ingestion, balance history, SQLite persistence,
 Access/read-only API/encryption/webhook, credential isolation and publication-guard tests.

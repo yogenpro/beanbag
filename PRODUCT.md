@@ -55,6 +55,12 @@ invented records; the separate private integration ledger is not its data source
   stored on the server. Any needed persistence must use browser storage. The
   implementation uses browser memory only, with no persistence across reloads.
 
+On November 14, 2026, the owner clarified that projection income (cash plus
+incoming stock) must compound year over year, with growth and uncertainty
+estimated from history. This supersedes the earlier one-time percentage scaling
+interpretation. Keep income growth distinct from investment returns and preserve
+browser-only scenario inputs.
+
 ## Brand Commitments
 
 The product name is Beanbag. The owner rejected the initial dashboard's visual

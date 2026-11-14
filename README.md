@@ -146,38 +146,51 @@ or new background price job.
 ## Future projections
 
 Projections starts from the latest saved combined net value and runs entirely in
-the browser using saved records from the existing read-only report API. Choose a
-12-month, 3-year, 5-year or Max (all available) history window and a 1–30-year
-horizon. Adjust monthly cash income and cash payments separately, each with its
-own percentage scale (100% keeps its baseline). The forecast subtracts scaled
-payments from scaled income; these constant multipliers are not annual growth
-rates. You can also adjust monthly net share transfers, annual geometric growth,
-return volatility and contribution variability. Changes update
-the graph immediately.
-Inputs stay in browser memory across dashboard tabs and reset on page reload;
-there are no server writes, cookies or local-storage records for scenarios.
+the browser using the existing read-only report API. Choose a 12-month, 3-year,
+5-year or Max (default: all available) history window and a 1–30-year horizon.
+Cash income and incoming stock transfers form combined income; cash payments
+and outgoing stock transfers form expenses. Set their monthly starting baselines,
+annual growth rates and annual growth uncertainty independently of investment
+returns. Income compounds: 5% annual growth means ×1.05 after one year and
+×1.1025 after two. The graph switches between account value and monthly income,
+each with a median and selectable 50%, 80% or 95% modeled outcome band.
 
-History estimates use at least three usable whole calendar months before the
-latest balance's month. Contribution estimates require both products' loaded
-transaction windows and no unresolved external flows. Known zero-flow months
-count; missing months do not. Cash income, cash payments and shares remain separate, using the existing
-accounting boundary and saved share-transfer values. Growth and volatility use
-monthly daily-linked time-weighted returns and additionally require every daily
-net balance, including the previous month-end. Missing estimates require manual
-assumptions rather than an invented zero or current market quote. Historical
-contribution variability is recalculated from paired months after scaling income
-and payments, preserving their covariance; an explicit variability override stays
-fixed. Dollar baseline edits shift the average without changing that variability.
+Monthly baselines use the most recent usable year (up to 12 months, at least
+three), rather than a multi-year average that dilutes an existing trend. Only
+whole calendar months inside both products' loaded transaction windows and free
+of unresolved flows qualify. Known zero-flow months count; missing months do not.
+The latest balance's month is excluded. Annual growth uses complete,
+non-overlapping 12-month blocks aligned to that month. Each growth observation
+compares adjacent annual blocks; missing years are never bridged. The rate is
+the geometric mean of year-over-year factors, and uncertainty is their sample
+standard deviation in log space. A rate requires two complete annual blocks;
+uncertainty requires three. Zero-total annual blocks make the affected geometric
+estimate undefined. Insufficient evidence withholds defaults and allows explicit
+manual assumptions. Few annual comparisons are prominently disclosed.
 
-The line is the median of 1,000 repeatable simulated paths; the shaded band covers
-the central 50%, 80% or 95% of modeled outcomes at each month. Monthly log returns
-and net contributions are independent normal draws with constant parameters;
-contributions arrive at month-end. Growth applies to positive balances. Negative
-values indicate an unfunded shortfall, without an assumed borrowing rate.
-Values are nominal, without inflation adjustment. This conditional outcome range
-does not establish a statistical confidence guarantee, estimate parameter
-uncertainty, or imply that past growth will persist. Model details, usable month
-lists, keyboard month inspection and an annual table are available in the tab.
+Saved share-transfer values and the existing accounting boundary remain intact.
+Internal transfers, trades, dividends, interest and fees are excluded from
+contributions. Investment growth still uses daily-linked time-weighted returns,
+requiring every daily net balance and the prior month-end; it is separate from
+income growth. The income graph works without investment or expense assumptions.
+
+The model simulates 1,000 repeatable paths. Each projection year draws independent
+normal log-growth factors for income and expenses and compounds their monthly
+equivalents for 12 months. Cash and stock income share the income growth factor;
+their starting mix stays fixed. Monthly income is added to account value and
+expenses subtracted at month-end, alongside independent monthly investment
+returns. Growth applies to positive account values; negative values indicate an
+unfunded shortfall, without an assumed borrowing rate. Values are nominal, without
+inflation adjustment. Bands reflect historical annual variation conditional on
+selected parameters; they do not establish guaranteed confidence coverage or
+include uncertainty in estimated parameters. Within-year seasonality, correlations
+between income/expenses/markets, changing allocations and future tax changes are
+not modeled. Past growth may not persist.
+
+Inputs stay in browser memory across dashboard tabs and reset on page reload.
+There are no server writes, cookies or local-storage scenario records. Model
+methods, actual annual-block dates, keyboard month inspection and annual tables
+are available in the tab. No source record or historical share value is revalued.
 
 ## Historical value change and returns
 

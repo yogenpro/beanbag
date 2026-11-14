@@ -128,3 +128,81 @@ export function longProjectionFixture(): Dashboard {
   });
   return fixture;
 }
+
+/** Four complete years, with cash + stock income growing 10%, 20%, then 10%. */
+export function annualProjectionFixture(): Dashboard {
+  const base = projectionFixture();
+  const records: FinancialEvent[] = [],
+    snapshots: BalanceSnapshot[] = [];
+  const anchor = "2026-05-15";
+  const factors = [1, 1.1, 1.32, 1.452];
+  let net = 10_000_000;
+  for (
+    let time = Date.parse("2022-04-30");
+    time <= Date.parse(anchor);
+    time += 86_400_000
+  ) {
+    const date = new Date(time).toISOString().slice(0, 10);
+    const index =
+      (Number(date.slice(0, 4)) - 2022) * 12 + Number(date.slice(5, 7)) - 5;
+    const year = Math.min(3, Math.max(0, Math.floor(index / 12)));
+    let incoming = 0,
+      outgoing = 0;
+    if (date.endsWith("-10"))
+      for (const [kind, amount] of [
+        ["cash_income", 100_000 * factors[year]],
+        ["stock_income", 50_000 * factors[year]],
+        ["spending", 40_000 * 1.1 ** year],
+        ["stock_spending", 10_000 * 1.1 ** year],
+      ] as const) {
+        const cents = Math.round(amount);
+        if (kind === "cash_income" || kind === "stock_income")
+          incoming += cents;
+        else outgoing += cents;
+        records.push({
+          ...base.records[0],
+          id: `${date}-${kind}`,
+          sourceId: `${date}-${kind}`,
+          date,
+          kind,
+          amountCents: cents,
+        });
+      }
+    if (date !== "2022-04-30")
+      net = Math.round((net + incoming) * 1.0001) - outgoing;
+    snapshots.push({
+      capturedAt: date + "T20:00:00Z",
+      asOfDate: date,
+      provider: "Invented annual-growth history",
+      accounts: accounts.map((account, i) => ({
+        accountId: account.id,
+        currentCents: i ? net - 100_000 : 100_000,
+        marginLoanCents: 0,
+        currency: "USD",
+        institutionUpdatedAt: null,
+      })),
+    });
+  }
+  const period = { start: "2022-04-30", end: anchor };
+  const coverage = base.coverage.map((value) => ({
+    ...value,
+    history: { ...value.history!, start: "2022-05-01", end: anchor },
+  }));
+  const summary = report(records, period);
+  return {
+    ...base,
+    ...summary,
+    availablePeriod: period,
+    trend: summary.months,
+    coverage,
+    balances: balanceReport(
+      snapshots,
+      accounts,
+      emptyBalanceHealth(),
+      period,
+      new Date(anchor + "T21:00:00Z"),
+      [],
+      { events: records, coverage },
+    ),
+  };
+}
