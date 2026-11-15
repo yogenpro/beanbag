@@ -27,6 +27,14 @@ import {
 } from "./repository";
 
 export class ConflictError extends Error {}
+type SavedEvent = {
+  id: string;
+  event_date: string;
+  kind: string;
+  status: string;
+  amount_cents: number | null;
+  event_json: string;
+};
 export class D1Ledger implements LedgerRepository {
   constructor(readonly db: D1Database) {}
   accountValueHistory() {
@@ -229,7 +237,12 @@ export class D1Ledger implements LedgerRepository {
       .prepare(
         `INSERT INTO source_records(id, source_kind, provider_id, account_id, event_date, revision, record_json, raw_json, removed)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET event_date=excluded.event_date,
-      revision=excluded.revision, record_json=excluded.record_json, raw_json=excluded.raw_json, removed=excluded.removed`,
+      revision=excluded.revision, record_json=excluded.record_json, raw_json=excluded.raw_json, removed=excluded.removed
+      WHERE source_records.event_date IS NOT excluded.event_date
+        OR source_records.revision IS NOT excluded.revision
+        OR source_records.record_json IS NOT excluded.record_json
+        OR source_records.raw_json IS NOT excluded.raw_json
+        OR source_records.removed IS NOT excluded.removed`,
       )
       .bind(
         eventId(s),
@@ -243,14 +256,19 @@ export class D1Ledger implements LedgerRepository {
         s.removed ? 1 : 0,
       );
   }
-  private eventStatement(e: FinancialEvent) {
+  private eventStatement(e: FinancialEvent, json = JSON.stringify(e)) {
     return this.db
       .prepare(
         `INSERT INTO financial_events(id, event_date, kind, status, amount_cents, event_json)
       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET event_date=excluded.event_date,
-      kind=excluded.kind, status=excluded.status, amount_cents=excluded.amount_cents, event_json=excluded.event_json`,
+      kind=excluded.kind, status=excluded.status, amount_cents=excluded.amount_cents, event_json=excluded.event_json
+      WHERE financial_events.event_date IS NOT excluded.event_date
+        OR financial_events.kind IS NOT excluded.kind
+        OR financial_events.status IS NOT excluded.status
+        OR financial_events.amount_cents IS NOT excluded.amount_cents
+        OR financial_events.event_json IS NOT excluded.event_json`,
       )
-      .bind(e.id, e.date, e.kind, e.status, e.amountCents, JSON.stringify(e));
+      .bind(e.id, e.date, e.kind, e.status, e.amountCents, json);
   }
   /** One D1 batch transaction publishes sources, derived events and cursor together. */
   async commitSync(commit: SyncCommit): Promise<void> {
@@ -264,12 +282,19 @@ export class D1Ledger implements LedgerRepository {
     )
       throw new ConflictError("Sync lease expired");
     const revision = await this.revision();
-    const [existing, accounts, overrides, valuations] = await Promise.all([
-      this.sources(),
-      this.accounts(),
-      this.overrides(),
-      this.valuations(),
-    ]);
+    const [existing, accounts, overrides, valuations, savedEvents] =
+      await Promise.all([
+        this.sources(),
+        this.accounts(),
+        this.overrides(),
+        this.valuations(),
+        this.db
+          .prepare(
+            "SELECT id,event_date,kind,status,amount_cents,event_json FROM financial_events",
+          )
+          .all<SavedEvent>(),
+      ]);
+    const savedById = new Map(savedEvents.results.map((e) => [e.id, e]));
     const map = new Map(existing.map((s) => [eventId(s), s]));
     for (const w of commit.writes) map.set(eventId(w.record), w.record);
     const removed = new Set(commit.removed);
@@ -338,7 +363,19 @@ export class D1Ledger implements LedgerRepository {
               commit.coverage.lastSuccess,
             ),
         );
-      statements.push(this.eventStatement(e));
+      // Reclassify the whole boundary: a changed transfer can affect another
+      // account's existing event. Publish only cache rows that actually differ.
+      const saved = savedById.get(e.id),
+        json = JSON.stringify(e);
+      if (
+        !saved ||
+        saved.event_date !== e.date ||
+        saved.kind !== e.kind ||
+        saved.status !== e.status ||
+        saved.amount_cents !== e.amountCents ||
+        saved.event_json !== json
+      )
+        statements.push(this.eventStatement(e, json));
     }
     statements.push(
       this.db

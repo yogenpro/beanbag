@@ -117,6 +117,14 @@ environment. A backup is not recovery proof until an isolated restore passes.
 
 ## Repair
 
+Sync reclassifies the selected account pair so new or corrected transfer legs can
+change existing counterpart events. It compares those results with the saved
+event cache and writes only missing or changed rows. Identical provider source
+upserts also skip updates. Empty/repeated pages still publish the cursor and sync
+health atomically; cached projection repairs and real corrections still write.
+This reduces D1 writes but does not establish that CPU, query or account-wide
+usage fits a hosting plan. Measure a controlled run before enabling a schedule.
+
 - **Consent/revocation:** use private operator recovery for the owning Item.
   Hosted repair tooling is pending; the dashboard has no Link or repair controls.
   Account ID changes require reconciliation and must never silently select a new
