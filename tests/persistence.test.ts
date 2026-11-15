@@ -3,6 +3,7 @@ import { D1Ledger } from "../src/data/d1";
 import { defaultCoverage } from "../src/data/repository";
 import { sqliteD1 } from "./sqlite-d1";
 import { accounts, bank, investment, override, valuation } from "./fixtures";
+import type { Source } from "../src/accounting/types";
 
 describe("D1-compatible SQLite persistence", () => {
   let database: ReturnType<typeof sqliteD1>, repo: D1Ledger;
@@ -17,7 +18,7 @@ describe("D1-compatible SQLite persistence", () => {
   });
   afterEach(() => database.sqlite.close());
   async function commit(
-    sources = [bank()],
+    sources: Source[] = [bank()],
     removed: string[] = [],
     cursor = "durable-cursor",
   ) {
@@ -39,6 +40,108 @@ describe("D1-compatible SQLite persistence", () => {
       },
     });
   }
+  function trackWrites() {
+    database.sqlite.exec(`
+      CREATE TEMP TABLE observed_writes(table_name TEXT, id TEXT);
+      CREATE TEMP TRIGGER observe_events_insert AFTER INSERT ON financial_events
+        BEGIN INSERT INTO observed_writes VALUES ('events', NEW.id); END;
+      CREATE TEMP TRIGGER observe_events_update AFTER UPDATE ON financial_events
+        BEGIN INSERT INTO observed_writes VALUES ('events', NEW.id); END;
+      CREATE TEMP TRIGGER observe_sources_update AFTER UPDATE ON source_records
+        BEGIN INSERT INTO observed_writes VALUES ('sources', NEW.id); END;
+    `);
+    return () =>
+      database.sqlite
+        .prepare(
+          "SELECT table_name,id FROM observed_writes ORDER BY table_name,id",
+        )
+        .all();
+  }
+  it("does not rewrite unchanged sources or events, while advancing sync health and cursor", async () => {
+    await commit([bank(), bank({ id: "another" })]);
+    const writes = trackWrites();
+    await commit([bank(), bank({ id: "another" })], [], "next-cursor");
+    await commit([], [], "empty-page-cursor");
+    expect(writes()).toEqual([]);
+    expect(await repo.cursor("checking")).toBe("empty-page-cursor");
+    expect((await repo.coverage())[0].lastSuccess).toBeTruthy();
+    expect(
+      database.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS count FROM sync_runs WHERE status='success'",
+        )
+        .get()?.count,
+    ).toBe(3);
+  });
+  it("writes only the corrected event, including changes that leave its amount unchanged", async () => {
+    await commit([bank(), bank({ id: "unrelated" })]);
+    const writes = trackWrites();
+    await commit([bank({ description: "Corrected payroll", revision: "v2" })]);
+    expect(writes()).toEqual([
+      { table_name: "events", id: "bank:bank-1" },
+      { table_name: "sources", id: "bank:bank-1" },
+    ]);
+    expect(
+      JSON.parse(
+        String(
+          database.sqlite
+            .prepare(
+              "SELECT event_json FROM financial_events WHERE id='bank:bank-1'",
+            )
+            .get()?.event_json,
+        ),
+      ).description,
+    ).toBe("Corrected payroll");
+  });
+  it("updates an existing counterpart when a new transfer leg changes its classification", async () => {
+    await commit([
+      bank({ amountCents: -25000, description: "ACH transfer" }),
+      bank({ id: "unrelated" }),
+    ]);
+    const writes = trackWrites();
+    await commit([
+      investment({
+        ticker: "CUR:USD",
+        securityType: "cash",
+        quantity: "0",
+        cashAmountCents: 25000,
+        origin: "unknown",
+        direction: "unknown",
+      }),
+    ]);
+    expect(writes().filter((w) => w.table_name === "events")).toEqual([
+      { table_name: "events", id: "bank:bank-1" },
+      { table_name: "events", id: "investment:stock-1" },
+    ]);
+    expect(
+      database.sqlite
+        .prepare("SELECT kind FROM financial_events WHERE id='bank:bank-1'")
+        .get()?.kind,
+    ).toBe("internal_transfer");
+  });
+  it("repairs missing or stale cached events even when the provider has no changes", async () => {
+    await commit([bank(), bank({ id: "missing" }), bank({ id: "unrelated" })]);
+    database.sqlite.exec(`
+      UPDATE financial_events SET amount_cents=NULL WHERE id='bank:bank-1';
+      DELETE FROM financial_events WHERE id='bank:missing';
+    `);
+    const writes = trackWrites();
+    await commit([]);
+    expect(writes()).toEqual([
+      { table_name: "events", id: "bank:bank-1" },
+      { table_name: "events", id: "bank:missing" },
+    ]);
+    expect(
+      database.sqlite
+        .prepare(
+          "SELECT amount_cents FROM financial_events WHERE id='bank:bank-1'",
+        )
+        .get()?.amount_cents,
+    ).toBe(400000);
+    database.sqlite.exec("DELETE FROM observed_writes");
+    await commit([]);
+    expect(writes()).toEqual([]);
+  });
   it("atomically stores source evidence, events and cursor, and upserts idempotently", async () => {
     await commit();
     await commit();
