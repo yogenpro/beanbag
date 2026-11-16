@@ -162,6 +162,17 @@ describe("checking cursor synchronization", () => {
   });
 });
 describe("investment polling and coverage", () => {
+  it("defaults to a seven-day overlap and leaves older corrections to reconciliation", async () => {
+    const old = investment({ id: "older", date: "2026-07-01" });
+    const repo = new MemoryLedger(accounts, [old]);
+    const provider = new FakePlaid([investmentPage([])]);
+    await new SyncService(provider, repo, "synthetic-token", now).investments();
+    expect(provider.calls[0].body).toMatchObject({
+      start_date: "2026-08-08",
+      end_date: "2026-08-15",
+    });
+    expect((await repo.sources())[0].removed).not.toBe(true);
+  });
   it("uses a bounded allowlisted window, preserves manual receipts, and reconciles disappearance", async () => {
     const manual = investment({ id: "manual:verified", manual: true });
     const repo = new MemoryLedger(accounts, [manual]);

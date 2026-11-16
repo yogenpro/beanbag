@@ -19,6 +19,12 @@ then run `npm run test:browser` against that stable build; inspect desktop/mobil
 screenshots. Tests and demos use invented records only. The synthetic in-memory
 preview is loopback-only; production requires signed Access JWTs and private D1.
 
+Routine sync prioritizes low Cloudflare reads and CPU. Use checking deltas and a
+seven-day brokerage overlap; do not scan or repair unrelated history on idle
+polls. The owner accepts deferred historical corrections and plans monthly
+statement reconciliation (November 16, 2026). Keep exact accounting rules and
+evidence intact; broader reconciliation/cache rebuilds are explicit maintenance.
+
 Deployment is managed by the separate private `infra` repository. This repo owns
 portable code, migrations and assets. Private infra owns deployment identity,
 domains, Access policy, D1 containers, cron and orchestration. Do not add production

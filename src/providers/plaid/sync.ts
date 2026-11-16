@@ -90,7 +90,7 @@ export class SyncService {
         }
       }
       if (!completed) throw new ProviderError("PAGINATION_LIMIT");
-      const coverage = await this.health("checking", started, writes, removed);
+      const coverage = await this.health("checking", started);
       if (originalCursor && coverage.history) {
         const end = pacificToday(this.now());
         coverage.history = {
@@ -128,7 +128,9 @@ export class SyncService {
       );
       if (!account) throw new ProviderError("ACCOUNT_CONFIGURATION_REQUIRED");
       end ??= pacificToday(this.now());
-      start ??= new Date(Date.parse(end + "T12:00:00Z") - 90 * 86_400_000)
+      // Routine polling favors small reads; monthly statement reconciliation
+      // handles older corrections. Operators can still request a wider window.
+      start ??= new Date(Date.parse(end + "T12:00:00Z") - 7 * 86_400_000)
         .toISOString()
         .slice(0, 10);
       if (
@@ -189,13 +191,7 @@ export class SyncService {
         end,
         presentIds: writes.map((w) => eventId(w.record)),
       };
-      const coverage = await this.health(
-        "investments",
-        started,
-        writes,
-        removed,
-        reconciliation,
-      );
+      const coverage = await this.health("investments", started);
       coverage.startDate =
         coverage.startDate && coverage.startDate < start
           ? coverage.startDate
@@ -234,45 +230,15 @@ export class SyncService {
   private async health(
     product: Coverage["product"],
     started: string,
-    writes: SourceWrite[],
-    removed: string[],
-    reconciliation?: { start: string; end: string; presentIds: string[] },
   ): Promise<Coverage> {
     const previous =
       (await this.repo.coverage()).find((c) => c.product === product) ??
       defaultCoverage(product);
-    const records = new Map(
-      (await this.repo.sources()).map((s) => [eventId(s), s]),
-    );
-    for (const write of writes)
-      records.set(eventId(write.record), write.record);
-    for (const id of removed) records.delete(id);
-    if (reconciliation)
-      for (const [id, source] of records) {
-        if (
-          source.kind === "investment" &&
-          !source.manual &&
-          source.date >= reconciliation.start &&
-          source.date <= reconciliation.end &&
-          !reconciliation.presentIds.includes(id)
-        )
-          records.delete(id);
-      }
-    const dates = [...records.values()]
-      .filter(
-        (s) =>
-          !s.removed &&
-          (product === "checking"
-            ? s.kind === "bank" && !s.pending
-            : s.kind === "investment"),
-      )
-      .map((s) => s.date)
-      .sort();
     return {
       ...previous,
       lastAttempt: started,
       lastSuccess: this.now().toISOString(),
-      mostRecentDate: dates.at(-1) ?? null,
+      // The repository computes the latest posted date after applying this batch.
       completeThrough: null,
       error: null,
       limitation:

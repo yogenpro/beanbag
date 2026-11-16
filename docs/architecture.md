@@ -50,7 +50,7 @@ publishes normalized sources, events, removals and the next cursor. A pagination
 mutation discards staged pages and restarts from the original durable cursor.
 Pending replacements tombstone the pending ID. Repeated data is an upsert.
 
-Investment polling uses a rolling 90-day overlap, a selected-account filter,
+Investment polling uses a rolling seven-day overlap, a selected-account filter,
 stable IDs and explicit cancellation handling. Complete windows tombstone
 disappeared provider records; manual evidence is preserved. A changed count or
 duplicate during pagination aborts reconciliation. Historical backfill uses the

@@ -1,4 +1,5 @@
 import { classify } from "../accounting/classify";
+import { affectedSource, polledInvestment, sourceWindows } from "./sync-scope";
 import {
   bankPaymentCategory,
   transferPricing,
@@ -35,6 +36,7 @@ type SavedEvent = {
   amount_cents: number | null;
   event_json: string;
 };
+type SavedSource = { id: string; record_json: string; raw_json: string };
 export class D1Ledger implements LedgerRepository {
   constructor(readonly db: D1Database) {}
   accountValueHistory() {
@@ -140,20 +142,120 @@ export class D1Ledger implements LedgerRepository {
         .all<Account>()
     ).results;
   }
-  private async jsonRows<T>(sql: string, column: string): Promise<T[]> {
-    const result = await this.db.prepare(sql).all<Record<string, string>>();
+  private async jsonRows<T>(
+    sql: string,
+    column: string,
+    ...values: string[]
+  ): Promise<T[]> {
+    const result = await this.db
+      .prepare(sql)
+      .bind(...values)
+      .all<Record<string, string>>();
     return result.results.map((r) => JSON.parse(r[column]) as T);
   }
   async sources(): Promise<Source[]> {
     const rows = await this.db
       .prepare("SELECT record_json, raw_json FROM source_records ORDER BY id")
       .all<{ record_json: string; raw_json: string }>();
-    return rows.results.map((row) =>
-      bankPaymentCategory(
-        transferPricing(JSON.parse(row.record_json), row.raw_json),
-        row.raw_json,
-      ),
+    return rows.results.map((row) => this.sourceFromRow(row));
+  }
+  private sourceFromRow(
+    row: Pick<SavedSource, "record_json" | "raw_json">,
+  ): Source {
+    return bankPaymentCategory(
+      transferPricing(JSON.parse(row.record_json), row.raw_json),
+      row.raw_json,
     );
+  }
+
+  private async sourceRows(
+    ids: string[],
+    window?: { start: string; end: string },
+  ): Promise<SavedSource[]> {
+    if (!ids.length && !window) return [];
+    return (
+      await this.db
+        .prepare(
+          `SELECT id,record_json,raw_json FROM source_records WHERE id IN (SELECT value FROM json_each(?))
+      ${window ? "UNION SELECT id,record_json,raw_json FROM source_records INDEXED BY source_date WHERE event_date BETWEEN ? AND ? AND source_kind='investment'" : ""}`,
+        )
+        .bind(
+          JSON.stringify(ids),
+          ...(window ? [window.start, window.end] : []),
+        )
+        .all<SavedSource>()
+    ).results;
+  }
+
+  private async savedEvents(ids?: string[]): Promise<SavedEvent[]> {
+    if (ids && !ids.length) return [];
+    return (
+      await this.db
+        .prepare(
+          `SELECT id,event_date,kind,status,amount_cents,event_json FROM financial_events
+       ${ids ? "WHERE id IN (SELECT value FROM json_each(?))" : ""}`,
+        )
+        .bind(...(ids ? [JSON.stringify(ids)] : []))
+        .all<SavedEvent>()
+    ).results;
+  }
+
+  private eventUpdates(
+    events: FinancialEvent[],
+    saved: SavedEvent[],
+    valuations: Record<string, Valuation>,
+    at: string,
+  ): D1PreparedStatement[] {
+    const byId = new Map(saved.map((e) => [e.id, e]));
+    const statements: D1PreparedStatement[] = [];
+    for (const event of events) {
+      if (event.valuation && !valuations[event.id])
+        statements.push(
+          this.db
+            .prepare(
+              "INSERT OR IGNORE INTO historical_prices(event_id,valuation_json,created_at) VALUES(?,?,?)",
+            )
+            .bind(event.id, JSON.stringify(event.valuation), at),
+        );
+      const old = byId.get(event.id),
+        json = JSON.stringify(event);
+      if (
+        !old ||
+        old.event_date !== event.date ||
+        old.kind !== event.kind ||
+        old.status !== event.status ||
+        old.amount_cents !== event.amountCents ||
+        old.event_json !== json
+      )
+        statements.push(this.eventStatement(event, json));
+    }
+    return statements;
+  }
+
+  /** Private maintenance only. Idle polling deliberately does not repair old caches. */
+  async rebuildEventCache(): Promise<void> {
+    const revision = await this.revision();
+    const [sources, accounts, overrides, valuations, saved] = await Promise.all(
+      [
+        this.sources(),
+        this.accounts(),
+        this.overrides(),
+        this.valuations(),
+        this.savedEvents(),
+      ],
+    );
+    await this.db.batch([
+      ...this.guard(revision),
+      this.db.prepare(
+        "INSERT INTO ledger_meta(id,revision) SELECT 1,0 WHERE EXISTS (SELECT 1 FROM sync_state WHERE lease_id IS NOT NULL)",
+      ),
+      ...this.eventUpdates(
+        reclassify(sources, accounts, overrides, valuations),
+        saved,
+        valuations,
+        new Date().toISOString(),
+      ),
+    ]);
   }
   async events(): Promise<FinancialEvent[]> {
     // Rules apply to saved evidence immediately, without a sync or browser write.
@@ -282,43 +384,136 @@ export class D1Ledger implements LedgerRepository {
     )
       throw new ConflictError("Sync lease expired");
     const revision = await this.revision();
-    const [existing, accounts, overrides, valuations, savedEvents] =
-      await Promise.all([
-        this.sources(),
-        this.accounts(),
-        this.overrides(),
-        this.valuations(),
-        this.db
-          .prepare(
-            "SELECT id,event_date,kind,status,amount_cents,event_json FROM financial_events",
-          )
-          .all<SavedEvent>(),
-      ]);
-    const savedById = new Map(savedEvents.results.map((e) => [e.id, e]));
-    const map = new Map(existing.map((s) => [eventId(s), s]));
-    for (const w of commit.writes) map.set(eventId(w.record), w.record);
+    // Read only provider IDs and the explicitly reconciled brokerage window.
+    const rows = await this.sourceRows(
+      [
+        ...new Set([
+          ...commit.writes.map((w) => eventId(w.record)),
+          ...commit.removed,
+        ]),
+      ],
+      commit.reconcileWindow,
+    );
+    const existing = new Map(rows.map((row) => [row.id, row]));
+    const changes = commit.writes.filter((w) => {
+      const old = existing.get(eventId(w.record));
+      return (
+        !old ||
+        old.record_json !== JSON.stringify(w.record) ||
+        old.raw_json !== w.raw
+      );
+    });
     const removed = new Set(commit.removed);
     if (commit.reconcileWindow) {
-      const w = commit.reconcileWindow,
-        present = new Set(w.presentIds);
-      for (const s of existing)
+      const window = commit.reconcileWindow,
+        present = new Set(window.presentIds);
+      for (const row of rows) {
+        const source = this.sourceFromRow(row);
         if (
-          s.kind === "investment" &&
-          !s.manual &&
-          s.date >= w.start &&
-          s.date <= w.end &&
-          !present.has(eventId(s))
+          polledInvestment(source) &&
+          source.date >= window.start &&
+          source.date <= window.end &&
+          !present.has(row.id)
         )
-          removed.add(eventId(s));
-    }
-    const removedWrites: SourceWrite[] = [];
-    for (const id of removed) {
-      const s = map.get(id);
-      if (s) {
-        const record = { ...s, removed: true };
-        map.set(id, record);
-        removedWrites.push({ record, raw: JSON.stringify({ removed: true }) });
+          removed.add(row.id);
       }
+    }
+    const current = new Map(existing);
+    for (const write of changes)
+      current.set(eventId(write.record), {
+        id: eventId(write.record),
+        record_json: JSON.stringify(write.record),
+        raw_json: write.raw,
+      });
+    // Preserve raw evidence; a repeated tombstone needs no write or classification.
+    const removedWrites = [...removed].flatMap((id) => {
+      const old = current.get(id);
+      if (!old) return [];
+      const record = this.sourceFromRow(old);
+      return record.removed
+        ? []
+        : [{ record: { ...record, removed: true }, raw: old.raw_json }];
+    });
+    const newRecords = [...changes, ...removedWrites];
+    const seeds = newRecords.flatMap((w) => {
+      const old = existing.get(eventId(w.record));
+      if (
+        old &&
+        JSON.stringify(this.sourceFromRow(old)) ===
+          JSON.stringify(
+            this.sourceFromRow({
+              record_json: JSON.stringify(w.record),
+              raw_json: w.raw,
+            }),
+          )
+      )
+        return [];
+      return old ? [this.sourceFromRow(old), w.record] : [w.record];
+    });
+    let eventStatements: D1PreparedStatement[] = [];
+    if (seeds.length) {
+      // Publish the six-day dependency neighborhood. An extra six-day margin
+      // supplies reciprocal competing matches without publishing partial edge rows.
+      const windows = sourceWindows(seeds, 12);
+      const nearby = (
+        await this.db
+          .prepare(
+            `SELECT s.id,s.record_json,s.raw_json FROM json_each(?) AS w
+         CROSS JOIN source_records AS s INDEXED BY source_date
+         WHERE s.event_date BETWEEN json_extract(w.value,'$.start') AND json_extract(w.value,'$.end')`,
+          )
+          .bind(JSON.stringify(windows))
+          .all<SavedSource>()
+      ).results;
+      const context = new Map(
+        nearby.map((row) => [row.id, this.sourceFromRow(row)]),
+      );
+      for (const write of newRecords)
+        context.set(
+          eventId(write.record),
+          this.sourceFromRow({
+            record_json: JSON.stringify(write.record),
+            raw_json: write.raw,
+          }),
+        );
+      const ids = [...context.keys()],
+        affected = [...context.values()].filter((s) =>
+          affectedSource(s, seeds),
+        );
+      const payload = JSON.stringify(ids);
+      const [accounts, overrides, priceRows, saved] = await Promise.all([
+        this.accounts(),
+        this.jsonRows<Override>(
+          "SELECT override_json FROM event_overrides WHERE event_id IN (SELECT value FROM json_each(?)) ORDER BY sequence",
+          "override_json",
+          payload,
+        ),
+        this.db
+          .prepare(
+            "SELECT event_id,valuation_json FROM historical_prices WHERE event_id IN (SELECT value FROM json_each(?))",
+          )
+          .bind(payload)
+          .all<{ event_id: string; valuation_json: string }>(),
+        this.savedEvents(affected.map(eventId)),
+      ]);
+      const valuations = Object.fromEntries(
+        priceRows.results.map((r) => [
+          r.event_id,
+          JSON.parse(r.valuation_json),
+        ]),
+      );
+      const affectedIds = new Set(affected.map(eventId));
+      eventStatements = this.eventUpdates(
+        reclassify(
+          [...context.values()],
+          accounts,
+          overrides,
+          valuations,
+        ).filter((e) => affectedIds.has(e.id)),
+        saved,
+        valuations,
+        commit.coverage.lastSuccess!,
+      );
     }
     // Guard against an expired/replaced lease inside the atomic transaction too.
     const statements: D1PreparedStatement[] = [
@@ -336,55 +531,31 @@ export class D1Ledger implements LedgerRepository {
           commit.leaseId,
         ),
     ];
-    for (const w of commit.writes) statements.push(this.sourceStatement(w));
-    for (const w of removedWrites)
-      statements.push(
-        this.db
-          .prepare(
-            "UPDATE source_records SET removed=1,record_json=? WHERE id=?",
-          )
-          .bind(JSON.stringify(w.record), eventId(w.record)),
-      );
-    for (const e of reclassify(
-      [...map.values()],
-      accounts,
-      overrides,
-      valuations,
-    )) {
-      if (e.valuation)
-        statements.push(
-          this.db
-            .prepare(
-              "INSERT OR IGNORE INTO historical_prices(event_id,valuation_json,created_at) VALUES(?,?,?)",
-            )
-            .bind(
-              e.id,
-              JSON.stringify(e.valuation),
-              commit.coverage.lastSuccess,
-            ),
-        );
-      // Reclassify the whole boundary: a changed transfer can affect another
-      // account's existing event. Publish only cache rows that actually differ.
-      const saved = savedById.get(e.id),
-        json = JSON.stringify(e);
-      if (
-        !saved ||
-        saved.event_date !== e.date ||
-        saved.kind !== e.kind ||
-        saved.status !== e.status ||
-        saved.amount_cents !== e.amountCents ||
-        saved.event_json !== json
-      )
-        statements.push(this.eventStatement(e, json));
-    }
+    for (const write of [...changes, ...removedWrites])
+      statements.push(this.sourceStatement(write));
+    statements.push(...eventStatements);
     statements.push(
       this.db
         .prepare(
-          "UPDATE sync_state SET cursor=?, coverage_json=?, lease_id=NULL, lease_until=NULL WHERE product=? AND lease_id=?",
+          `UPDATE sync_state SET cursor=?, coverage_json=json_set(?, '$.mostRecentDate',
+           ${
+             seeds.length
+               ? `(SELECT event_date FROM source_records INDEXED BY source_date
+            WHERE source_kind=? AND removed=0 AND (?='investment' OR json_extract(record_json,'$.pending') IS NOT 1)
+            ORDER BY event_date DESC LIMIT 1)`
+               : "json_extract(sync_state.coverage_json,'$.mostRecentDate')"
+           }),
+           lease_id=NULL, lease_until=NULL WHERE product=? AND lease_id=?`,
         )
         .bind(
           commit.cursor,
           JSON.stringify(commit.coverage),
+          ...(seeds.length
+            ? [
+                commit.product === "checking" ? "bank" : "investment",
+                commit.product === "checking" ? "bank" : "investment",
+              ]
+            : []),
           commit.product,
           commit.leaseId,
         ),
