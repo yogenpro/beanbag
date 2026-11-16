@@ -1,5 +1,16 @@
 # Beanbag next steps
 
+## Incremental routine sync — November 16, 2026
+
+The owner prioritizes Cloudflare resource savings and accepts deferred historical
+corrections with monthly statement reconciliation. Regular ingestion uses
+checking deltas and a seven-day brokerage overlap. It reads/reclassifies only
+changed records and bounded transfer/duplicate dependencies; unchanged polling
+does not inspect old cached events. Explicit private cache maintenance remains
+available for reconciliation/rule changes. Exact accounting and saved evidence
+are preserved. No schema, public write route or schedule is added. Runtime CPU
+and controlled deployment evidence must be checked separately from local tests.
+
 ## Browser-only projections — November 13, 2026
 
 The dashboard now includes Projections alongside Overview, Activity and Data
@@ -332,7 +343,7 @@ internal cash transfers, trades, brokerage dividends and appreciation are
 excluded. Stock income is in-kind reporting, not cash or taxable wages.
 
 Before larger backfills, review the current 5,000-change/100-page staging cap,
-90-day investment overlap, in-memory report/reclassification work and provider
+seven-day routine investment overlap, in-memory report/reclassification work and provider
 request timeouts. Coverage through a particular date remains unknown unless
 established independently. See [architecture](architecture.md) for details.
 

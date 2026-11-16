@@ -117,13 +117,23 @@ environment. A backup is not recovery proof until an isolated restore passes.
 
 ## Repair
 
-Sync reclassifies the selected account pair so new or corrected transfer legs can
-change existing counterpart events. It compares those results with the saved
-event cache and writes only missing or changed rows. Identical provider source
-upserts also skip updates. Empty/repeated pages still publish the cursor and sync
-health atomically; cached projection repairs and real corrections still write.
-This reduces D1 writes but does not establish that CPU, query or account-wide
-usage fits a hosting plan. Measure a controlled run before enabling a schedule.
+Routine sync prioritizes bounded reads and CPU. Checking uses cursor deltas;
+brokerage compares a seven-day overlap with saved provider IDs and dates. An
+unchanged batch skips classification and event-cache reads. Changed records load
+only their old/new date neighborhoods, relevant decisions/prices and affected
+cached events. Transfer matching includes reciprocal ambiguity and same-date
+share duplicates; context-only edge rows are not published. Latest posted dates
+come from the existing date index when records change; idle sync retains the
+saved latest date without a source query. Cursor,
+health and changed event publication remain atomic.
+
+Routine sync does not repair unrelated historical cache rows or search older
+brokerage corrections. Monthly statement reconciliation is the intended repair
+path. Private operator tooling can explicitly call `D1Ledger.rebuildEventCache()`
+after rules/reconciliation changes; it refuses active sync leases and uses a
+ledger revision guard. Reporting still applies current rules on reads. No
+maintenance route is exposed in the dashboard. Measure a controlled run before
+enabling a schedule; lower reads do not establish a hosting plan's CPU allowance.
 
 - **Consent/revocation:** use private operator recovery for the owning Item.
   Hosted repair tooling is pending; the dashboard has no Link or repair controls.
@@ -138,7 +148,7 @@ usage fits a hosting plan. Measure a controlled run before enabling a schedule.
   repository revision checks, preserving the old decision in the audit log.
 - **Oversized initial batch:** no partial totals/cursor are published. Use a
   reviewed staging import/chunked-ingestion extension; do not raise limits blindly.
-- **Historical investment corrections:** the automated overlap is 90 days.
+- **Historical investment corrections:** the automated overlap is seven days.
   Explicitly run additional bounded service windows when reconciling older data.
   There is no public backfill/admin-SQL endpoint.
 - **Missing transfer value:** normal incoming/outgoing transfers need no separate

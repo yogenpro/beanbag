@@ -17,6 +17,7 @@ import {
   type SyncCommit,
 } from "./repository";
 import { ConflictError } from "./d1";
+import { polledInvestment } from "./sync-scope";
 import {
   emptyBalanceHealth,
   type BalanceSnapshot,
@@ -121,8 +122,7 @@ export class MemoryLedger implements LedgerRepository {
       const w = commit.reconcileWindow;
       for (const [id, source] of this.records)
         if (
-          source.kind === "investment" &&
-          !source.manual &&
+          polledInvestment(source) &&
           source.date >= w.start &&
           source.date <= w.end &&
           !w.presentIds.includes(id)
@@ -136,8 +136,20 @@ export class MemoryLedger implements LedgerRepository {
     for (const event of await this.events())
       if (event.valuation && !this.prices[event.id])
         this.prices[event.id] = structuredClone(event.valuation);
+    const dates = [...this.records.values()]
+      .filter(
+        (s) =>
+          !s.removed &&
+          (commit.product === "checking"
+            ? s.kind === "bank" && !s.pending
+            : s.kind === "investment"),
+      )
+      .map((s) => s.date)
+      .sort();
     this.health = this.health.map((h) =>
-      h.product === commit.product ? commit.coverage : h,
+      h.product === commit.product
+        ? { ...commit.coverage, mostRecentDate: dates.at(-1) ?? null }
+        : h,
     );
     this.cursors.set(commit.product, commit.cursor);
     this.leases.delete(commit.product);

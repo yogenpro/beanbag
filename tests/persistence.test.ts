@@ -119,7 +119,7 @@ describe("D1-compatible SQLite persistence", () => {
         .get()?.kind,
     ).toBe("internal_transfer");
   });
-  it("repairs missing or stale cached events even when the provider has no changes", async () => {
+  it("leaves unrelated cache repair to explicit maintenance instead of idle polling", async () => {
     await commit([bank(), bank({ id: "missing" }), bank({ id: "unrelated" })]);
     database.sqlite.exec(`
       UPDATE financial_events SET amount_cents=NULL WHERE id='bank:bank-1';
@@ -127,6 +127,8 @@ describe("D1-compatible SQLite persistence", () => {
     `);
     const writes = trackWrites();
     await commit([]);
+    expect(writes()).toEqual([]);
+    await repo.rebuildEventCache();
     expect(writes()).toEqual([
       { table_name: "events", id: "bank:bank-1" },
       { table_name: "events", id: "bank:missing" },
