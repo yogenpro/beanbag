@@ -1,5 +1,14 @@
 # Beanbag next steps
 
+## Worker-native provider transport — November 17, 2026
+
+The provider client invokes native `fetch` with the global receiver. Calling it
+as a client-object method fails in workerd even when Node-based ingestion works.
+A synthetic Worker-runtime regression intercepts all provider requests and checks
+this behavior without credentials. Keep this test alongside repository/accounting
+tests: an operator process using D1 is not a hosted scheduled execution. Actual
+cron outcomes, product health and CPU observations remain private verification.
+
 ## Incremental routine sync — November 16, 2026
 
 The owner prioritizes Cloudflare resource savings and accepts deferred historical

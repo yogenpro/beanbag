@@ -40,7 +40,8 @@ export class PlaidClient implements PlaidApi {
   ): Promise<T> {
     if (!/^\/[a-z_]+(?:\/[a-z_]+)+$/.test(path))
       throw new Error("Invalid provider path");
-    const response = await this.fetcher(this.base + path, {
+    // workerd's native fetch rejects a PlaidClient as its receiver.
+    const response = await this.fetcher.call(globalThis, this.base + path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
